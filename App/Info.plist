@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleDevelopmentRegion</key>
+    <string>ru</string>
+    <key>CFBundleDisplayName</key>
+    <string>materialTun</string>
+    <key>CFBundleExecutable</key>
+    <string>materialTun</string>
+    <key>CFBundleIconFile</key>
+    <string>AppIcon</string>
+    <key>CFBundleIdentifier</key>
+    <string>local.materialtun</string>
+    <key>CFBundleName</key>
+    <string>materialTun</string>
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+    <key>CFBundleShortVersionString</key>
+    <string>2.0.0</string>
+    <key>CFBundleVersion</key>
+    <string>2</string>
+    <key>LSMinimumSystemVersion</key>
+    <string>14.0</string>
+    <key>NSHighResolutionCapable</key>
+    <true/>
+    <key>NSPrincipalClass</key>
+    <string>NSApplication</string>
+    <key>CFBundleDocumentTypes</key>
+    <array>
+        <dict>
+            <key>CFBundleTypeExtensions</key>
+            <array>
+                <string>json</string>
+                <string>txt</string>
+                <string>happ</string>
+            </array>
+            <key>CFBundleTypeName</key>
+            <string>Proxy configuration</string>
+            <key>CFBundleTypeRole</key>
+            <string>Viewer</string>
+        </dict>
+    </array>
+    <key>CFBundleURLTypes</key>
+    <array>
+        <dict>
+            <key>CFBundleURLName</key>
+            <string>local.materialtun</string>
+            <key>CFBundleURLSchemes</key>
+            <array>
+                <string>materialtun</string>
+                <string>vless</string>
+                <string>vmess</string>
+                <string>trojan</string>
+                <string>hysteria2</string>
+                <string>tuic</string>
+                <string>anytls</string>
+            </array>
+        </dict>
+    </array>
+</dict>
+</plist>

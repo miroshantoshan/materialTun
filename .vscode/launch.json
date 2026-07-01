@@ -1,0 +1,44 @@
+{
+    "configurations": [
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:VPN Client}",
+            "name": "Debug materialTun",
+            "target": "materialTun",
+            "configuration": "debug",
+            "preLaunchTask": "swift: Build Debug materialTun"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:VPN Client}",
+            "name": "Release materialTun",
+            "target": "materialTun",
+            "configuration": "release",
+            "preLaunchTask": "swift: Build Release materialTun"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:VPN Client}",
+            "name": "Debug materialTunHelper",
+            "target": "materialTunHelper",
+            "configuration": "debug",
+            "preLaunchTask": "swift: Build Debug materialTunHelper"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:VPN Client}",
+            "name": "Release materialTunHelper",
+            "target": "materialTunHelper",
+            "configuration": "release",
+            "preLaunchTask": "swift: Build Release materialTunHelper"
+        }
+    ]
+}
