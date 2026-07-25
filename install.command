@@ -3,7 +3,8 @@
 set -u
 set -o pipefail
 
-REPOSITORY_ARCHIVE="https://github.com/miroshantoshan/materialTun/archive/refs/heads/main.tar.gz"
+REPOSITORY_ARCHIVE="https://codeload.github.com/miroshantoshan/materialTun/tar.gz/refs/heads/main"
+REPOSITORY_ARCHIVE_FALLBACK="https://github.com/miroshantoshan/materialTun/archive/refs/heads/main.tar.gz"
 SING_BOX_LATEST_RELEASE="https://github.com/SagerNet/sing-box/releases/latest"
 GEO_RELEASE_BASE="https://github.com/Loyalsoldier/v2ray-rules-dat/releases/latest/download"
 GEO_MIRROR_BASE="https://cdn.jsdelivr.net/gh/Loyalsoldier/v2ray-rules-dat@release"
@@ -121,17 +122,17 @@ run_with_spinner() {
     local task_pid=$!
 
     while kill -0 "$task_pid" 2>/dev/null || (( SECONDS - started < minimum_seconds )); do
-        print -n -- "\r${LIGHT_PURPLE}      ${frames[$frame]} $label${RESET}   "
+        print -n -- "\r\e[K${LIGHT_PURPLE}      ${frames[$frame]} $label · $((SECONDS - started))s${RESET}"
         frame=$((frame % ${#frames[@]} + 1))
         sleep 0.12
     done
 
     if wait "$task_pid"; then
-        print -- "\r${GREEN}      ✓ $label${RESET}                 "
+        print -- "\r\e[K${GREEN}      ✓ $label${RESET}"
         return 0
     fi
 
-    print -- "\r${RED}      ✕ $label${RESET}                    "
+    print -- "\r\e[K${RED}      ✕ $label${RESET}"
     return 1
 }
 
@@ -197,6 +198,24 @@ download_file() {
         --connect-timeout 15 --max-time 300 \
         --retry 3 --retry-delay 2 --retry-all-errors \
         "$fallback" --output "$destination"
+}
+
+download_source() {
+    print -- "Downloading materialTun source from GitHub codeload..."
+    if curl --fail --location --silent --show-error \
+        --user-agent "materialTun-Installer/2.0" \
+        --connect-timeout 8 --max-time 45 \
+        --retry 1 --retry-delay 1 \
+        "$REPOSITORY_ARCHIVE" --output "$ARCHIVE_PATH"; then
+        return 0
+    fi
+
+    print -- "The direct source endpoint failed. Trying the GitHub archive URL..."
+    curl --fail --location --silent --show-error \
+        --user-agent "materialTun-Installer/2.0" \
+        --connect-timeout 10 --max-time 60 \
+        --retry 1 --retry-delay 1 \
+        "$REPOSITORY_ARCHIVE_FALLBACK" --output "$ARCHIVE_PATH"
 }
 
 download_runtime() {
@@ -305,12 +324,7 @@ done
 ensure_swift
 
 step "1/5" "Download materialTun" "Fetching the latest source code from GitHub"
-if ! run_with_spinner "Downloading source code..." 2 \
-    curl --fail --location --silent --show-error \
-    --connect-timeout 15 --max-time 180 \
-    --speed-limit 1024 --speed-time 30 \
-    --retry 3 --retry-delay 2 --retry-all-errors --retry-max-time 240 \
-    "$REPOSITORY_ARCHIVE" --output "$ARCHIVE_PATH"; then
+if ! run_with_spinner "Downloading source code..." 2 download_source; then
     fail "Could not download materialTun. Check your internet connection or VPN."
 fi
 
