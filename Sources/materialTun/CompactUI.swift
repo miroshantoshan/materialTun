@@ -14,6 +14,8 @@ enum CompactTab: String, CaseIterable {
         case .settings: "slider.horizontal.3"
         }
     }
+
+    var title: String { loc(rawValue) }
 }
 
 enum SeedColor: String, CaseIterable, Identifiable {
@@ -94,6 +96,7 @@ struct CompactRootView: View {
             }
         }
         .tint(seed)
+        .environment(\.locale, Locale(identifier: store.language.rawValue))
         .preferredColorScheme(.dark)
         .frame(width: 640, height: 470)
         .animation(.spring(response: 0.44, dampingFraction: 0.82), value: tab)
@@ -108,14 +111,14 @@ struct CompactRootView: View {
                 store.importFiles([url])
             } else {
                 let count = store.addProfiles(from: url.absoluteString)
-                store.showToast(count > 0 ? "Profile imported" : "Link not recognized")
+                store.showToast(count > 0 ? loc("Profile imported") : loc("Link not recognized"))
             }
         }
     }
 
     private var compactTopBar: some View {
         ZStack {
-            Text(tab.rawValue)
+            Text(tab.title)
                 .font(.system(size: 13, weight: .bold, design: .rounded))
 
             HStack(spacing: 10) {
@@ -124,7 +127,7 @@ struct CompactRootView: View {
                         Circle()
                             .fill(seed)
                             .frame(width: 9, height: 9)
-                        Text(store.activeWorkspace?.name ?? "Personal")
+                        Text(store.activeWorkspace.map { loc($0.name) } ?? loc("Personal"))
                             .font(.system(size: 12, weight: .semibold))
                             .lineLimit(1)
                         Image(systemName: "chevron.down").font(.system(size: 8, weight: .bold))
@@ -137,13 +140,13 @@ struct CompactRootView: View {
                 Spacer()
 
                 Menu {
-                    Button("Import from Clipboard") {
+                    Button(loc("Import from Clipboard")) {
                         let text = NSPasteboard.general.string(forType: .string) ?? ""
                         let count = store.addProfiles(from: text)
-                        store.showToast(count > 0 ? "Added: \(count)" : "Nothing found")
+                        store.showToast(count > 0 ? locf("Added: %d", count) : loc("Nothing found"))
                     }
-                    Button("QR Code from Image…") { store.importQRImage() }
-                    Button("Check for Updates") { Task { await store.checkForUpdates() } }
+                    Button(loc("QR Code from Image…")) { store.importQRImage() }
+                    Button(loc("Check for Updates")) { Task { await store.checkForUpdates() } }
                 } label: {
                     Image(systemName: "ellipsis")
                         .frame(width: 30, height: 30)
@@ -256,16 +259,16 @@ struct CompactConnectionView: View {
             VStack(spacing: 3) {
                 Text(store.state.title)
                     .font(.system(size: 20, weight: .bold, design: .rounded))
-                Text(store.selectedServer?.name ?? "Select a server")
+                Text(store.selectedServer?.name ?? loc("Select a server"))
                     .font(.system(size: 11, weight: .medium))
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
             }
 
             HStack(spacing: 8) {
-                TinyMetric(icon: "clock", value: duration, label: "Session")
-                TinyMetric(icon: "arrow.down", value: rate(store.downRate), label: "Download")
-                TinyMetric(icon: "arrow.up", value: rate(store.upRate), label: "Upload")
+                TinyMetric(icon: "clock", value: duration, label: loc("Session"))
+                TinyMetric(icon: "arrow.down", value: rate(store.downRate), label: loc("Download"))
+                TinyMetric(icon: "arrow.up", value: rate(store.upRate), label: loc("Upload"))
             }
 
             if let server = store.selectedServer {
@@ -277,7 +280,7 @@ struct CompactConnectionView: View {
                             .font(.system(size: 9)).foregroundStyle(.secondary).lineLimit(1)
                     }
                     Spacer()
-                    Button(server.ping.map { $0 > 0 ? "\($0) ms" : "Ping" } ?? "Ping") {
+                    Button(server.ping.map { $0 > 0 ? "\($0) ms" : loc("Ping") } ?? loc("Ping")) {
                         store.testLatency(server.id)
                     }
                     .font(.system(size: 10, weight: .semibold))
@@ -373,16 +376,16 @@ struct CompactProfilesView: View {
     var body: some View {
         VStack(spacing: 8) {
             HStack(spacing: 8) {
-                Text("Servers")
+                Text(loc("Servers"))
                     .font(.system(size: 13, weight: .bold, design: .rounded))
 
                 Spacer()
                 Menu {
-                    Button("Link or JSON") { showImport = true }
-                    Button("From Clipboard") { importClipboard() }
-                    Button("QR Code from Image") { store.importQRImage() }
-                    Button("Subscription") { showSubscription = true }
-                    Button("File…") { openFiles() }
+                    Button(loc("Link or JSON")) { showImport = true }
+                    Button(loc("From Clipboard")) { importClipboard() }
+                    Button(loc("QR Code from Image")) { store.importQRImage() }
+                    Button(loc("Subscription")) { showSubscription = true }
+                    Button(loc("File…")) { openFiles() }
                 } label: {
                     Image(systemName: "plus")
                         .font(.system(size: 12, weight: .bold))
@@ -412,7 +415,7 @@ struct CompactProfilesView: View {
     private var profileSection: some View {
         VStack(spacing: 7) {
             HStack {
-                Text("Added Manually")
+                Text(loc("Added Manually"))
                     .font(.system(size: 11, weight: .bold))
                 Text("\(manualProfiles.count)")
                     .font(.system(size: 9, weight: .semibold))
@@ -422,7 +425,7 @@ struct CompactProfilesView: View {
             if manualProfiles.isEmpty {
                 VStack(spacing: 5) {
                     Image(systemName: "square.stack.3d.up.slash").foregroundStyle(.secondary)
-                    Text("No manual profiles").font(.system(size: 10, weight: .semibold))
+                    Text(loc("No manual profiles")).font(.system(size: 10, weight: .semibold))
                 }
                 .frame(maxWidth: .infinity).frame(height: 72)
                 .compactCard()
@@ -440,21 +443,21 @@ struct CompactProfilesView: View {
     private var subscriptionSection: some View {
         VStack(spacing: 7) {
             HStack {
-                Text("Subscriptions")
+                Text(loc("Subscriptions"))
                     .font(.system(size: 11, weight: .bold))
                 Text("\(store.subscriptions.count)")
                     .font(.system(size: 9, weight: .semibold))
                     .foregroundStyle(.secondary)
                 Spacer()
-                Button("Update All") { Task { await store.updateAllSubscriptions() } }
+                Button(loc("Update All")) { Task { await store.updateAllSubscriptions() } }
                     .font(.system(size: 10, weight: .semibold))
             }
             if store.subscriptions.isEmpty {
                 HStack {
                     Image(systemName: "link.badge.plus").foregroundStyle(seed)
-                    Text("Add a subscription URL").font(.system(size: 10))
+                    Text(loc("Add a subscription URL")).font(.system(size: 10))
                     Spacer()
-                    Button("Add") { showSubscription = true }
+                    Button(loc("Add")) { showSubscription = true }
                         .font(.system(size: 9, weight: .semibold))
                 }
                 .padding(10).compactCard()
@@ -465,7 +468,7 @@ struct CompactProfilesView: View {
                             CompactSubscriptionRow(subscription: subscription, seed: seed)
                             let profiles = profiles(for: subscription)
                             if profiles.isEmpty {
-                                Text("This subscription has no servers yet")
+                                Text(loc("This subscription has no servers yet"))
                                     .font(.system(size: 9))
                                     .foregroundStyle(.secondary)
                                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -495,12 +498,12 @@ struct CompactProfilesView: View {
         HStack(spacing: 7) {
             HStack(spacing: 6) {
                 Image(systemName: "magnifyingglass").font(.system(size: 10)).foregroundStyle(.secondary)
-                TextField("Search all servers", text: $search).textFieldStyle(.plain).font(.system(size: 11))
+                TextField(loc("Search all servers"), text: $search).textFieldStyle(.plain).font(.system(size: 11))
             }
             .padding(.horizontal, 10).frame(height: 30).compactCard()
 
-            Menu(sort.rawValue) {
-                ForEach(ProfileSort.allCases) { item in Button(item.rawValue) { sort = item } }
+            Menu(loc(sort.rawValue)) {
+                ForEach(ProfileSort.allCases) { item in Button(loc(item.rawValue)) { sort = item } }
             }
             .font(.system(size: 10)).frame(width: 66)
         }
@@ -508,7 +511,7 @@ struct CompactProfilesView: View {
 
     private func importClipboard() {
         let count = store.addProfiles(from: NSPasteboard.general.string(forType: .string) ?? "")
-        store.showToast(count > 0 ? "Added: \(count)" : "Not recognized")
+        store.showToast(count > 0 ? locf("Added: %d", count) : loc("Not recognized"))
     }
 
     private func openFiles() {
@@ -543,22 +546,22 @@ struct CompactServerRow: View {
                 Spacer()
                 latency
                 Menu {
-                    Button("Test Latency") { store.testLatency(server.id) }
-                    Button("Edit") { editServer = server }
-                    Button("Duplicate") { store.duplicate(server) }
-                    Menu("Export") {
-                        Button("Native Link") { store.exportProfile(server, format: "Native") }
+                    Button(loc("Test Latency")) { store.testLatency(server.id) }
+                    Button(loc("Edit")) { editServer = server }
+                    Button(loc("Duplicate")) { store.duplicate(server) }
+                    Menu(loc("Export")) {
+                        Button(loc("Native Link")) { store.exportProfile(server, format: "Native") }
                         Button("palazikVPN") { store.exportProfile(server, format: "palazikVPN") }
                         Button("JSON") { store.exportProfile(server, format: "JSON") }
-                        Button("QR Code…") { store.saveProfileQR(server) }
+                        Button(loc("QR Code…")) { store.saveProfileQR(server) }
                     }
-                    Button(server.favorite ? "Remove from Favorites" : "Add to Favorites") {
+                    Button(loc(server.favorite ? "Remove from Favorites" : "Add to Favorites")) {
                         if let index = store.servers.firstIndex(where: { $0.id == server.id }) {
                             store.servers[index].favorite.toggle(); store.save()
                         }
                     }
                     Divider()
-                    Button("Delete", role: .destructive) { confirmDelete = true }
+                    Button(loc("Delete"), role: .destructive) { confirmDelete = true }
                 } label: {
                     Image(systemName: "ellipsis").frame(width: 24, height: 30)
                 }
@@ -569,12 +572,12 @@ struct CompactServerRow: View {
         }
         .buttonStyle(.plain)
         .confirmationDialog(
-            "Delete “\(server.name)”?",
+            locf("Delete “%@”?", server.name),
             isPresented: $confirmDelete,
             titleVisibility: .visible
         ) {
-            Button("Delete", role: .destructive) { store.deleteServer(server) }
-            Button("Cancel", role: .cancel) {}
+            Button(loc("Delete"), role: .destructive) { store.deleteServer(server) }
+            Button(loc("Cancel"), role: .cancel) {}
         }
     }
 
@@ -625,17 +628,17 @@ struct CompactSubscriptionRow: View {
         }
         .padding(10).compactCard()
         .confirmationDialog(
-            "Delete the “\(subscription.name)” subscription and all its servers?",
+            locf("Delete the “%@” subscription and all its servers?", subscription.name),
             isPresented: $confirmDelete,
             titleVisibility: .visible
         ) {
-            Button("Delete", role: .destructive) { store.deleteSubscription(subscription) }
-            Button("Cancel", role: .cancel) {}
+            Button(loc("Delete"), role: .destructive) { store.deleteSubscription(subscription) }
+            Button(loc("Cancel"), role: .cancel) {}
         }
     }
 
     private var expiryText: String {
-        guard let expire = details?.expire else { return "No expiration date" }
+        guard let expire = details?.expire else { return loc("No expiration date") }
         let calendar = Calendar.current
         let days = calendar.dateComponents(
             [.day],
@@ -643,12 +646,12 @@ struct CompactSubscriptionRow: View {
             to: calendar.startOfDay(for: expire)
         ).day ?? 0
         let date = expire.formatted(.dateTime.day().month(.twoDigits).year())
-        if days < 0 { return "Subscription expired on \(date)" }
-        return "Subscription expires on \(date) (\(days) \(dayWord(days)) remaining)"
+        if days < 0 { return locf("Subscription expired on %@", date) }
+        return locf("Subscription expires on %@ (%d %@ remaining)", date, days, dayWord(days))
     }
 
     private func dayWord(_ value: Int) -> String {
-        return value == 1 ? "day" : "days"
+        return loc(value == 1 ? "day" : "days")
     }
 
     private func formatBytes(_ value: Int64) -> String {
@@ -700,7 +703,7 @@ struct CompactSettingsView: View {
                                 }
                                 HStack {
                                     Image(systemName: settingsIcon(item)).frame(width: 16)
-                                    Text(item).lineLimit(1)
+                                    Text(loc(item)).lineLimit(1)
                                     Spacer()
                                 }
                                 .padding(.horizontal, 9)
@@ -751,13 +754,30 @@ struct CompactSettingsView: View {
 }
 
 struct AppearanceSettings: View {
+    @EnvironmentObject private var store: AppStore
     let seed: Color
     @AppStorage("SeedColor") private var seedName = SeedColor.purple.rawValue
 
     var body: some View {
         SettingHeader("Appearance", icon: "paintpalette.fill")
+        HStack {
+            Text(loc("Language")).font(.system(size: 10, weight: .medium))
+            Spacer()
+            Picker("", selection: Binding(
+                get: { store.language },
+                set: { store.setLanguage($0) }
+            )) {
+                ForEach(AppLanguage.allCases) { language in
+                    Text(language.name).tag(language)
+                }
+            }
+            .labelsHidden()
+            .frame(width: 150)
+            .controlSize(.small)
+        }
+        .compactSettingBox()
         VStack(alignment: .leading, spacing: 7) {
-            Text("Interface Theme").font(.system(size: 10, weight: .semibold))
+            Text(loc("Interface Theme")).font(.system(size: 10, weight: .semibold))
             HStack(spacing: 10) {
                 ForEach(SeedColor.allCases) { item in
                     Button { seedName = item.rawValue } label: {
@@ -771,7 +791,7 @@ struct AppearanceSettings: View {
                         }
                     }
                     .buttonStyle(.plain)
-                    .help(item.rawValue)
+                    .help(loc(item.rawValue))
                 }
                 Spacer()
             }
@@ -818,7 +838,7 @@ struct DNSSettings: View {
         CompactTextRow(title: "geosite.dat URL", text: $geoSiteURL)
         HStack {
             Spacer()
-            Button("Update Geo Files") {
+            Button(loc("Update Geo Files")) {
                 Task { await store.updateGeoFiles(geoIPURL: geoIPURL, geoSiteURL: geoSiteURL) }
             }
             .font(.system(size: 9, weight: .semibold))
@@ -867,31 +887,31 @@ struct WorkspaceSettings: View {
         ForEach(store.workspaces) { workspace in
             HStack {
                 Circle().fill(seed).frame(width: 10, height: 10)
-                Text(workspace.name).font(.system(size: 10, weight: .semibold))
+                Text(loc(workspace.name)).font(.system(size: 10, weight: .semibold))
                 Spacer()
-                if workspace.id == store.activeWorkspaceID { Text("Active").font(.system(size: 8)).foregroundStyle(seed) }
-                else { Button("Switch") { store.switchWorkspace(workspace.id) }.font(.system(size: 9)) }
+                if workspace.id == store.activeWorkspaceID { Text(loc("Active")).font(.system(size: 8)).foregroundStyle(seed) }
+                else { Button(loc("Switch")) { store.switchWorkspace(workspace.id) }.font(.system(size: 9)) }
                 if store.workspaces.count > 1 {
                     Button { workspaceToDelete = workspace } label: { Image(systemName: "trash") }
                         .buttonStyle(.plain).foregroundStyle(.red.opacity(0.7))
                 }
             }.compactSettingBox()
         }
-        Text("Each workspace stores its own configurations, subscriptions, and active server.")
+        Text(loc("Each workspace stores its own configurations, subscriptions, and active server."))
             .font(.system(size: 9)).foregroundStyle(.secondary)
         .confirmationDialog(
-            "Delete this user workspace?",
+            loc("Delete this user workspace?"),
             isPresented: Binding(
                 get: { workspaceToDelete != nil },
                 set: { if !$0 { workspaceToDelete = nil } }
             ),
             titleVisibility: .visible
         ) {
-            Button("Delete", role: .destructive) {
+            Button(loc("Delete"), role: .destructive) {
                 if let workspaceToDelete { store.deleteWorkspace(workspaceToDelete.id) }
                 workspaceToDelete = nil
             }
-            Button("Cancel", role: .cancel) { workspaceToDelete = nil }
+            Button(loc("Cancel"), role: .cancel) { workspaceToDelete = nil }
         } message: {
             Text(workspaceToDelete?.name ?? "")
         }
@@ -905,28 +925,28 @@ struct DataSettings: View {
         SettingHeader("Data and Diagnostics", icon: "externaldrive.fill")
         VStack(alignment: .leading, spacing: 7) {
             HStack(spacing: 6) {
-                Button("Create Backup") { saveBackup() }
+                Button(loc("Create Backup")) { saveBackup() }
                     .frame(width: 120)
-                Button("Restore") { restoreBackup() }
+                Button(loc("Restore")) { restoreBackup() }
                     .frame(width: 120)
                 Spacer()
             }
             HStack(spacing: 6) {
-                Button("Copy Log") {
+                Button(loc("Copy Log")) {
                     NSPasteboard.general.clearContents()
                     NSPasteboard.general.setString(store.logs.joined(separator: "\n"), forType: .string)
                 }
                 .frame(width: 120)
-                Button("Save Log") { saveLog() }
+                Button(loc("Save Log")) { saveLog() }
                     .frame(width: 120)
-                Button("Clear") { confirmClearLogs = true }
+                Button(loc("Clear")) { confirmClearLogs = true }
                     .frame(width: 80)
                 Spacer()
             }
         }
         .font(.system(size: 9))
         ScrollView {
-            Text(store.logs.isEmpty ? "Logs will appear after connecting." : store.logs.joined(separator: "\n"))
+            Text(store.logs.isEmpty ? loc("Logs will appear after connecting.") : store.logs.joined(separator: "\n"))
                 .font(.system(size: 8, design: .monospaced))
                 .textSelection(.enabled)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -935,12 +955,12 @@ struct DataSettings: View {
         .frame(height: 150)
         .background(.black.opacity(0.22), in: RoundedRectangle(cornerRadius: 10))
         .confirmationDialog(
-            "Clear the diagnostics log?",
+            loc("Clear the diagnostics log?"),
             isPresented: $confirmClearLogs,
             titleVisibility: .visible
         ) {
-            Button("Clear", role: .destructive) { store.logs.removeAll() }
-            Button("Cancel", role: .cancel) {}
+            Button(loc("Clear"), role: .destructive) { store.logs.removeAll() }
+            Button(loc("Cancel"), role: .cancel) {}
         }
     }
 
@@ -949,7 +969,7 @@ struct DataSettings: View {
         panel.nameFieldStringValue = "materialTun-backup.json"
         panel.allowedContentTypes = [.json]
         if panel.runModal() == .OK, let url = panel.url {
-            do { try store.backup(to: url); store.showToast("Backup created") }
+            do { try store.backup(to: url); store.showToast(loc("Backup created")) }
             catch { store.showToast(error.localizedDescription) }
         }
     }
@@ -957,8 +977,8 @@ struct DataSettings: View {
         let panel = NSOpenPanel()
         panel.allowedContentTypes = [.json]
         if panel.runModal() == .OK, let url = panel.url {
-            do { try store.restoreBackup(from: url); store.showToast("Data restored") }
-            catch { store.showToast("Invalid backup") }
+            do { try store.restoreBackup(from: url); store.showToast(loc("Data restored")) }
+            catch { store.showToast(loc("Invalid backup")) }
         }
     }
     private func saveLog() {
@@ -979,9 +999,9 @@ struct AboutSettings: View {
             Image(systemName: "shield.lefthalf.filled")
                 .font(.system(size: 34)).foregroundStyle(seed)
             Text("materialTun").font(.system(size: 18, weight: .bold, design: .rounded))
-            Text("A compact Xray + sing-box client for macOS")
+            Text(loc("A compact Xray + sing-box client for macOS"))
                 .font(.system(size: 9)).foregroundStyle(.secondary)
-            Button("Check for Updates") { Task { await store.checkForUpdates() } }
+            Button(loc("Check for Updates")) { Task { await store.checkForUpdates() } }
                 .font(.system(size: 10, weight: .semibold))
             if !store.updateStatus.isEmpty {
                 Text(store.updateStatus).font(.system(size: 9)).foregroundStyle(.secondary)
@@ -1000,7 +1020,7 @@ struct ImportPreviewSheet: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("Import").font(.system(size: 18, weight: .bold, design: .rounded))
+            Text(loc("Import")).font(.system(size: 18, weight: .bold, design: .rounded))
             TextEditor(text: $text)
                 .font(.system(size: 10, design: .monospaced))
                 .scrollContentBackground(.hidden)
@@ -1008,20 +1028,20 @@ struct ImportPreviewSheet: View {
                 .background(.black.opacity(0.18), in: RoundedRectangle(cornerRadius: 12))
             if let first = parsed.first {
                 VStack(alignment: .leading, spacing: 4) {
-                    Label("\(parsed.count) configurations", systemImage: "checkmark.circle.fill").foregroundStyle(.green)
+                    Label(locf("%d configurations", parsed.count), systemImage: "checkmark.circle.fill").foregroundStyle(.green)
                     Text("\(first.type.rawValue) · \(first.host):\(first.port)")
-                    Text(first.rawURI.contains("security=reality") ? "REALITY" : "Link parameters verified")
+                    Text(first.rawURI.contains("security=reality") ? "REALITY" : loc("Link parameters verified"))
                         .foregroundStyle(.secondary)
                 }.font(.system(size: 10)).padding(9).compactCard()
             } else if !text.isEmpty {
-                Label("Format not recognized yet", systemImage: "exclamationmark.triangle.fill")
+                Label(loc("Format not recognized yet"), systemImage: "exclamationmark.triangle.fill")
                     .font(.system(size: 10)).foregroundStyle(.orange)
             }
             HStack {
-                Button("From Clipboard") { text = NSPasteboard.general.string(forType: .string) ?? "" }
+                Button(loc("From Clipboard")) { text = NSPasteboard.general.string(forType: .string) ?? "" }
                 Spacer()
-                Button("Cancel") { dismiss() }
-                Button("Import") {
+                Button(loc("Cancel")) { dismiss() }
+                Button(loc("Import")) {
                     let count = store.addProfiles(from: text)
                     if count > 0 { dismiss() }
                 }
@@ -1041,11 +1061,11 @@ struct CompactEditorSheet: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 9) {
-            Text("Profile").font(.system(size: 18, weight: .bold))
+            Text(loc("Profile")).font(.system(size: 18, weight: .bold))
             CompactTextRow(title: "Name", text: $server.name)
             CompactTextRow(title: "Server", text: $server.host)
             HStack {
-                Text("Port").font(.system(size: 10))
+                Text(loc("Port")).font(.system(size: 10))
                 Spacer()
                 TextField("", value: $server.port, format: .number).frame(width: 90)
                     .textFieldStyle(.plain)
@@ -1057,15 +1077,15 @@ struct CompactEditorSheet: View {
                 CompactTextRow(title: "Packet Size", text: $options.fragmentLength)
                 CompactTextRow(title: "Interval", text: $options.fragmentInterval)
             }
-            SecureField("Secrets are hidden · edit the original link if needed", text: .constant(""))
+            SecureField(loc("Secrets are hidden · edit the original link if needed"), text: .constant(""))
                 .textFieldStyle(.plain)
                 .font(.system(size: 9))
                 .padding(8)
                 .background(Color(hex: "2B2930"), in: RoundedRectangle(cornerRadius: 10))
             HStack {
                 Spacer()
-                Button("Cancel") { dismiss() }
-                Button("Save") {
+                Button(loc("Cancel")) { dismiss() }
+                Button(loc("Save")) {
                     if let index = store.servers.firstIndex(where: { $0.id == server.id }) { store.servers[index] = server }
                     store.profileOptions[server.id] = options
                     store.save(); dismiss()
@@ -1084,15 +1104,15 @@ struct CompactSubscriptionSheet: View {
     @State private var url = ""
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("New Subscription").font(.system(size: 18, weight: .bold))
-            Text("The name will be detected automatically from the provider response.")
+            Text(loc("New Subscription")).font(.system(size: 18, weight: .bold))
+            Text(loc("The name will be detected automatically from the provider response."))
                 .font(.system(size: 9))
                 .foregroundStyle(.secondary)
             CompactTextRow(title: "URL", text: $url)
             HStack {
                 Spacer()
-                Button("Cancel") { dismiss() }
-                Button("Add") {
+                Button(loc("Cancel")) { dismiss() }
+                Button(loc("Add")) {
                     Task { await store.addSubscription(name: "", url: url); dismiss() }
                 }.buttonStyle(.borderedProminent).tint(seed).disabled(url.isEmpty)
             }.font(.system(size: 10))
@@ -1109,7 +1129,7 @@ struct WorkspaceSheet: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
-                Text("User Workspaces").font(.system(size: 17, weight: .bold))
+                Text(loc("User Workspaces")).font(.system(size: 17, weight: .bold))
                 Spacer()
                 Button { onClose() } label: {
                     Image(systemName: "xmark")
@@ -1124,7 +1144,7 @@ struct WorkspaceSheet: View {
                     store.switchWorkspace(workspace.id); onClose()
                 } label: {
                     HStack {
-                        Text(workspace.name).font(.system(size: 11, weight: .semibold))
+                        Text(loc(workspace.name)).font(.system(size: 11, weight: .semibold))
                         Spacer()
                         Text("\(workspace.servers.count)").font(.system(size: 9)).foregroundStyle(.secondary)
                         if store.activeWorkspaceID == workspace.id { Image(systemName: "checkmark").foregroundStyle(seed) }
@@ -1132,13 +1152,13 @@ struct WorkspaceSheet: View {
                 }.buttonStyle(.plain)
             }
             Divider()
-            TextField("New Workspace", text: $name)
+            TextField(loc("New Workspace"), text: $name)
                 .textFieldStyle(.plain)
                 .padding(8)
                 .background(Color(hex: "2B2930"), in: RoundedRectangle(cornerRadius: 10))
             HStack {
                 Spacer()
-                Button("Create") {
+                Button(loc("Create")) {
                     store.createWorkspace(name: name, colorHex: "6750A4"); onClose()
                 }.buttonStyle(.borderedProminent).tint(seed)
             }
@@ -1161,20 +1181,20 @@ struct OnboardingView: View {
             Image(systemName: page == 0 ? "shield.lefthalf.filled" : page == 1 ? "square.and.arrow.down" : "lock.shield")
                 .font(.system(size: 48)).foregroundStyle(seed)
                 .symbolEffect(.bounce, value: page)
-            Text(["Welcome", "Add a Configuration", "Allow TUN"][page])
+            Text(loc(["Welcome", "Add a Configuration", "Allow TUN"][page]))
                 .font(.system(size: 22, weight: .bold, design: .rounded))
-            Text([
+            Text(loc([
                 "A compact VPN client for Xray and sing-box.",
                 "Paste a link or open a file, subscription, or QR code.",
                 "For full-device VPN, macOS will request an administrator password. System Proxy works without it."
-            ][page])
+            ][page]))
             .font(.system(size: 11)).foregroundStyle(.secondary)
             .multilineTextAlignment(.center).frame(width: 340)
             Spacer()
             HStack {
-                if page > 0 { Button("Back") { page -= 1 } }
+                if page > 0 { Button(loc("Back")) { page -= 1 } }
                 Spacer()
-                Button(page == 2 ? "Get Started" : "Next") {
+                Button(loc(page == 2 ? "Get Started" : "Next")) {
                     if page < 2 { page += 1 }
                     else { store.completeOnboarding(); dismiss() }
                 }.buttonStyle(.borderedProminent).tint(seed)
@@ -1191,8 +1211,8 @@ struct CompactEmpty: View {
         VStack(spacing: 7) {
             Spacer()
             Image(systemName: icon).font(.system(size: 28)).foregroundStyle(.secondary)
-            Text(title).font(.system(size: 12, weight: .semibold))
-            Text(subtitle).font(.system(size: 9)).foregroundStyle(.secondary)
+            Text(loc(title)).font(.system(size: 12, weight: .semibold))
+            Text(loc(subtitle)).font(.system(size: 9)).foregroundStyle(.secondary)
             Spacer()
         }.frame(maxWidth: .infinity, maxHeight: .infinity)
     }
@@ -1205,7 +1225,7 @@ struct SettingHeader: View {
     var body: some View {
         HStack {
             Image(systemName: icon)
-            Text(title).font(.system(size: 13, weight: .bold, design: .rounded))
+            Text(loc(title)).font(.system(size: 13, weight: .bold, design: .rounded))
             Spacer()
         }.padding(.bottom, 2)
     }
@@ -1218,8 +1238,8 @@ struct CompactToggle: View {
     var body: some View {
         HStack {
             VStack(alignment: .leading, spacing: 1) {
-                Text(title).font(.system(size: 10, weight: .medium))
-                Text(subtitle).font(.system(size: 8)).foregroundStyle(.secondary)
+                Text(loc(title)).font(.system(size: 10, weight: .medium))
+                Text(loc(subtitle)).font(.system(size: 8)).foregroundStyle(.secondary)
             }
             Spacer()
             Toggle("", isOn: $value).labelsHidden().toggleStyle(.switch).controlSize(.mini)
@@ -1233,7 +1253,7 @@ struct ToggleRowWithAction: View {
     let action: (Bool) -> Void
     var body: some View {
         HStack {
-            Text(title).font(.system(size: 10, weight: .medium))
+            Text(loc(title)).font(.system(size: 10, weight: .medium))
             Spacer()
             Toggle("", isOn: Binding(get: { value }, set: { newValue in action(newValue) }))
                 .labelsHidden().toggleStyle(.switch).controlSize(.mini)
@@ -1247,10 +1267,10 @@ struct CompactPicker: View {
     let values: [String]
     var body: some View {
         HStack {
-            Text(title).font(.system(size: 10, weight: .medium))
+            Text(loc(title)).font(.system(size: 10, weight: .medium))
             Spacer()
             Picker("", selection: $selection) {
-                ForEach(values, id: \.self) { Text($0).tag($0) }
+                ForEach(values, id: \.self) { Text(loc($0)).tag($0) }
             }.labelsHidden().frame(width: 150).controlSize(.small)
         }.compactSettingBox()
     }
@@ -1266,10 +1286,10 @@ struct EnumPickerRow<T: Hashable & Identifiable & RawRepresentable>: View where 
     }
     var body: some View {
         HStack {
-            Text(title).font(.system(size: 10, weight: .medium))
+            Text(loc(title)).font(.system(size: 10, weight: .medium))
             Spacer()
             Picker("", selection: $selection) {
-                ForEach(values) { Text($0.rawValue).tag($0) }
+                ForEach(values) { Text(loc($0.rawValue)).tag($0) }
             }.labelsHidden().frame(width: 165).controlSize(.small)
         }.compactSettingBox()
     }
@@ -1280,7 +1300,7 @@ struct CompactTextRow: View {
     @Binding var text: String
     var body: some View {
         HStack {
-            Text(title).font(.system(size: 10, weight: .medium))
+            Text(loc(title)).font(.system(size: 10, weight: .medium))
             Spacer()
             TextField("", text: $text)
                 .textFieldStyle(.plain)
@@ -1296,7 +1316,7 @@ struct TokenCompactEditor: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 5) {
             HStack {
-                Text(title).font(.system(size: 10, weight: .medium))
+                Text(loc(title)).font(.system(size: 10, weight: .medium))
                 Spacer()
                 Text("\(values.count)").font(.system(size: 8)).foregroundStyle(.secondary)
             }
@@ -1359,20 +1379,20 @@ struct CompactMenuBarView: View {
                     .font(.system(size: 9)).foregroundStyle(.secondary)
             }
             Divider()
-            Button(store.state.connected ? "Disconnect" : "Connect") { store.toggleConnection() }
-            Menu("Server") {
+            Button(loc(store.state.connected ? "Disconnect" : "Connect")) { store.toggleConnection() }
+            Menu(loc("Server")) {
                 ForEach(store.servers) { server in
                     Button(server.name) { store.selectedServerID = server.id; store.save() }
                 }
             }
-            Menu("Workspace") {
+            Menu(loc("Workspace")) {
                 ForEach(store.workspaces) { workspace in
-                    Button(workspace.name) { store.switchWorkspace(workspace.id) }
+                    Button(loc(workspace.name)) { store.switchWorkspace(workspace.id) }
                 }
             }
             Divider()
-            Button("Open") { NSApp.activate(ignoringOtherApps: true); openWindow(id: "main") }
-            Button("Quit") { NSApp.terminate(nil) }
+            Button(loc("Open")) { NSApp.activate(ignoringOtherApps: true); openWindow(id: "main") }
+            Button(loc("Quit")) { NSApp.terminate(nil) }
         }
         .padding(11).frame(width: 240)
         .onReceive(Timer.publish(every: 1, on: .main, in: .common).autoconnect()) { now = $0 }

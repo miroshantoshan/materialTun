@@ -128,7 +128,7 @@ extension AppStore {
         activeWorkspaceID = id
         loadWorkspace(id)
         save()
-        showToast("Workspace switched")
+        showToast(loc("Workspace switched"))
     }
 
     func createWorkspace(name: String, colorHex: String) {
@@ -205,13 +205,13 @@ extension AppStore {
         }
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(value, forType: .string)
-        showToast("\(format) copied")
+        showToast(locf("%@ copied", format))
     }
 
     func saveProfileQR(_ server: ServerProfile) {
         guard let data = server.rawURI.data(using: .utf8),
               let filter = CIFilter(name: "CIQRCodeGenerator") else {
-            showToast("Could not create QR code")
+            showToast(loc("Could not create QR code"))
             return
         }
         filter.setValue(data, forKey: "inputMessage")
@@ -227,7 +227,7 @@ extension AppStore {
         panel.nameFieldStringValue = "\(server.name)-QR.png"
         panel.allowedContentTypes = [.png]
         if panel.runModal() == .OK, let url = panel.url {
-            do { try png.write(to: url, options: .atomic); showToast("QR code saved") }
+            do { try png.write(to: url, options: .atomic); showToast(loc("QR code saved")) }
             catch { showToast(error.localizedDescription) }
         }
     }
@@ -263,18 +263,18 @@ extension AppStore {
                 }
             }
             save()
-            showToast("Latency test completed")
+            showToast(loc("Latency test completed"))
         }
     }
 
     func selectFastest() {
         guard let fastest = servers.filter({ ($0.ping ?? 0) > 0 }).min(by: { ($0.ping ?? .max) < ($1.ping ?? .max) }) else {
-            showToast("Test latency first")
+            showToast(loc("Test latency first"))
             return
         }
         selectedServerID = fastest.id
         save()
-        showToast("Selected \(fastest.name) · \(fastest.ping ?? 0) ms")
+        showToast(locf("Selected %@ · %d ms", fastest.name, fastest.ping ?? 0))
     }
 
     func refreshSubscriptionEnhanced(_ subscription: Subscription) async {
@@ -288,7 +288,7 @@ extension AppStore {
                 throw NSError(
                     domain: "materialTun.Subscription",
                     code: 403,
-                    userInfo: [NSLocalizedDescriptionKey: "The provider rejected this VPN client"]
+                    userInfo: [NSLocalizedDescriptionKey: loc("The provider rejected this VPN client")]
                 )
             }
             let parsed = result.profiles
@@ -296,7 +296,7 @@ extension AppStore {
                 throw NSError(
                     domain: "materialTun.Subscription",
                     code: 422,
-                    userInfo: [NSLocalizedDescriptionKey: "The subscription contains no supported configurations"]
+                    userInfo: [NSLocalizedDescriptionKey: loc("The subscription contains no supported configurations")]
                 )
             }
             replaceProfiles(parsed, for: subscription.id)
@@ -319,12 +319,12 @@ extension AppStore {
                 subscriptionDetails[subscription.id] = details
             }
             save()
-            showToast("Updated \(count) configurations")
+            showToast(locf("Updated %d configurations", count))
         } catch {
             var details = subscriptionDetails[subscription.id] ?? SubscriptionDetails()
             details.lastError = error.localizedDescription
             subscriptionDetails[subscription.id] = details
-            showToast("Update failed")
+            showToast(loc("Update failed"))
         }
     }
 
@@ -461,11 +461,11 @@ extension AppStore {
               let image = CIImage(contentsOf: url),
               let detector = CIDetector(ofType: CIDetectorTypeQRCode, context: nil),
               let message = detector.features(in: image).compactMap({ ($0 as? CIQRCodeFeature)?.messageString }).first else {
-            showToast("QR code not found")
+            showToast(loc("QR code not found"))
             return
         }
         let count = addProfiles(from: message)
-        showToast(count > 0 ? "QR code imported" : "QR code contains no configuration")
+        showToast(count > 0 ? loc("QR code imported") : loc("QR code contains no configuration"))
     }
 
     func backup(to url: URL) throws {
@@ -500,19 +500,19 @@ extension AppStore {
             settings.launchAtLogin = enabled
             save()
         } catch {
-            showToast("macOS: \(error.localizedDescription)")
+            showToast(locf("macOS: %@", error.localizedDescription))
         }
     }
 
     func checkForUpdates() async {
-        updateStatus = "Checking…"
+        updateStatus = loc("Checking…")
         guard let url = URL(string: "https://api.github.com/repos/palazik/palazikVPN/releases/latest") else { return }
         do {
             let (data, _) = try await URLSession.shared.data(from: url)
             let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
-            updateStatus = json?["tag_name"].map { "Latest version: \($0)" } ?? "No releases yet"
+            updateStatus = (json?["tag_name"] as? String).map { locf("Latest version: %@", $0) } ?? loc("No releases yet")
         } catch {
-            updateStatus = "Could not check for updates"
+            updateStatus = loc("Could not check for updates")
         }
     }
 
@@ -522,7 +522,7 @@ extension AppStore {
             (geoSiteURL, "geosite.dat")
         ].filter { !$0.0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
         guard !targets.isEmpty else {
-            showToast("Enter the Geo file URLs")
+            showToast(loc("Enter the Geo file URLs"))
             return
         }
         let folder = supportURL.appendingPathComponent("geo", isDirectory: true)
@@ -536,9 +536,9 @@ extension AppStore {
                 }
                 try data.write(to: folder.appendingPathComponent(name), options: .atomic)
             }
-            showToast("Geo files updated")
+            showToast(loc("Geo files updated"))
         } catch {
-            showToast("Geo: \(error.localizedDescription)")
+            showToast(locf("Geo: %@", error.localizedDescription))
         }
     }
 
@@ -549,11 +549,11 @@ extension AppStore {
 
     func connectWithSingBox(_ server: ServerProfile) {
         guard settings.mode == .systemProxy else {
-            state = .failed("Select System Proxy for this protocol")
+            state = .failed(loc("Select System Proxy for this protocol"))
             return
         }
         guard let binary = Bundle.main.url(forResource: "sing-box", withExtension: nil) else {
-            state = .failed("sing-box not found")
+            state = .failed(loc("sing-box not found"))
             return
         }
         disconnect(silent: true)
@@ -577,13 +577,13 @@ extension AppStore {
             Task {
                 try? await Task.sleep(for: .milliseconds(700))
                 guard process.isRunning else {
-                    state = .failed("sing-box failed to start")
+                    state = .failed(loc("sing-box failed to start"))
                     return
                 }
                 applySystemProxy()
                 state = .connected(Date())
                 startStats()
-                log("Connected through sing-box")
+                log(loc("Connected through sing-box"))
             }
         } catch {
             state = .failed(error.localizedDescription)
@@ -667,7 +667,7 @@ enum SingBoxConfigBuilder {
             outbound["peer_public_key"] = query["public_key"] ?? query["peer_public_key"] ?? ""
             outbound["local_address"] = (query["address"] ?? "172.16.0.2/32").split(separator: ",").map(String.init)
         default:
-            throw NSError(domain: "materialTun", code: 40, userInfo: [NSLocalizedDescriptionKey: "Unsupported sing-box profile"])
+            throw NSError(domain: "materialTun", code: 40, userInfo: [NSLocalizedDescriptionKey: loc("Unsupported sing-box profile")])
         }
         let config: [String: Any] = [
             "log": ["level": settings.logLevel],

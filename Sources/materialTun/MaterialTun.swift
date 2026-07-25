@@ -30,6 +30,8 @@ enum AppTab: String, CaseIterable {
         case .settings: "slider.horizontal.3"
         }
     }
+
+    var title: String { loc(rawValue) }
 }
 
 enum ProxyProtocol: String, Codable, CaseIterable, Sendable {
@@ -191,11 +193,11 @@ enum ConnectionState: Equatable {
 
     var title: String {
         switch self {
-        case .disconnected: "Disconnected"
-        case .connecting: "Connecting…"
-        case .connected: "Protected"
-        case .disconnecting: "Disconnecting…"
-        case .failed: "Error"
+        case .disconnected: loc("Disconnected")
+        case .connecting: loc("Connecting…")
+        case .connected: loc("Protected")
+        case .disconnecting: loc("Disconnecting…")
+        case .failed: loc("Error")
         }
     }
 
@@ -227,6 +229,9 @@ final class AppStore: ObservableObject {
     @Published var profileOptions = [UUID: ProfileOptions]()
     @Published var subscriptionDetails = [UUID: SubscriptionDetails]()
     @Published var updateStatus = ""
+    @Published var language = AppLanguage(
+        rawValue: UserDefaults.standard.string(forKey: "AppLanguage") ?? ""
+    ) ?? .english
     @Published var onboardingComplete = UserDefaults.standard.bool(forKey: "materialTunOnboardingComplete")
 
     var xrayProcess: Process?
@@ -294,6 +299,11 @@ final class AppStore: ObservableObject {
         }
     }
 
+    func setLanguage(_ language: AppLanguage) {
+        UserDefaults.standard.set(language.rawValue, forKey: "AppLanguage")
+        self.language = language
+    }
+
     func addProfiles(from input: String, subscriptionID: UUID? = nil) -> Int {
         let parsed = ConfigParser.parseMany(input, subscriptionID: subscriptionID)
         mergeProfiles(parsed)
@@ -358,12 +368,12 @@ final class AppStore: ObservableObject {
             defer { url.stopAccessingSecurityScopedResource() }
             if let text = try? String(contentsOf: url, encoding: .utf8) { count += addProfiles(from: text) }
         }
-        showToast(count > 0 ? "Servers added: \(count)" : "No supported configurations found")
+        showToast(count > 0 ? locf("Servers added: %d", count) : loc("No supported configurations found"))
     }
 
     func addSubscription(name: String, url: String) async {
         guard let remote = URL(string: url), ["http", "https"].contains(remote.scheme?.lowercased() ?? "") else {
-            showToast("Invalid subscription URL")
+            showToast(loc("Invalid subscription URL"))
             return
         }
         var item = Subscription(name: name.isEmpty ? (remote.host?.replacingOccurrences(of: "www.", with: "") ?? "Subscription") : name, url: url)
@@ -373,11 +383,11 @@ final class AppStore: ObservableObject {
             let text = String(data: data, encoding: .utf8) ?? ""
             let result = await parseSubscription(text, subscriptionID: item.id)
             guard !result.isRejected else {
-                throw NSError(domain: "materialTun.Subscription", code: 403, userInfo: [NSLocalizedDescriptionKey: "The provider rejected this client"])
+                throw NSError(domain: "materialTun.Subscription", code: 403, userInfo: [NSLocalizedDescriptionKey: loc("The provider rejected this client")])
             }
             let parsed = result.profiles
             guard !parsed.isEmpty else {
-                throw NSError(domain: "materialTun.Subscription", code: 422, userInfo: [NSLocalizedDescriptionKey: "The subscription contains no supported configurations"])
+                throw NSError(domain: "materialTun.Subscription", code: 422, userInfo: [NSLocalizedDescriptionKey: loc("The subscription contains no supported configurations")])
             }
             mergeProfiles(parsed)
             let count = parsed.count
@@ -389,10 +399,10 @@ final class AppStore: ObservableObject {
             }
             if let i = subscriptions.firstIndex(where: { $0.id == item.id }) { subscriptions[i] = item }
             save()
-            showToast("Subscription added · \(count) servers")
+            showToast(locf("Subscription added · %d servers", count))
         } catch {
             save()
-            showToast("Subscription saved, but currently unavailable")
+            showToast(loc("Subscription saved, but currently unavailable"))
         }
     }
 
@@ -403,11 +413,11 @@ final class AppStore: ObservableObject {
             let text = String(data: data, encoding: .utf8) ?? ""
             let result = await parseSubscription(text, subscriptionID: subscription.id)
             guard !result.isRejected else {
-                throw NSError(domain: "materialTun.Subscription", code: 403, userInfo: [NSLocalizedDescriptionKey: "The provider rejected this client"])
+                throw NSError(domain: "materialTun.Subscription", code: 403, userInfo: [NSLocalizedDescriptionKey: loc("The provider rejected this client")])
             }
             let parsed = result.profiles
             guard !parsed.isEmpty else {
-                throw NSError(domain: "materialTun.Subscription", code: 422, userInfo: [NSLocalizedDescriptionKey: "The subscription contains no supported configurations"])
+                throw NSError(domain: "materialTun.Subscription", code: 422, userInfo: [NSLocalizedDescriptionKey: loc("The subscription contains no supported configurations")])
             }
             replaceProfiles(parsed, for: subscription.id)
             let count = parsed.count
@@ -419,9 +429,9 @@ final class AppStore: ObservableObject {
                 }
             }
             save()
-            showToast("Updated \(count) configurations")
+            showToast(locf("Updated %d configurations", count))
         } catch {
-            showToast("Could not update subscription")
+            showToast(loc("Could not update subscription"))
         }
     }
 
@@ -481,7 +491,7 @@ final class AppStore: ObservableObject {
 
     func connect() {
         guard let server = selectedServer else {
-            showToast("Add and select a server first")
+            showToast(loc("Add and select a server first"))
             tab = .servers
             return
         }
@@ -490,7 +500,7 @@ final class AppStore: ObservableObject {
             return
         }
         guard let xray = Bundle.main.url(forResource: "xray", withExtension: nil) else {
-            state = .failed("Xray engine not found")
+            state = .failed(loc("Xray engine not found"))
             return
         }
         disconnect(silent: true)
@@ -498,7 +508,7 @@ final class AppStore: ObservableObject {
         let attemptID = UUID()
         connectionAttemptID = attemptID
         state = .connecting
-        log("Preparing \(server.type.rawValue) · \(server.host):\(server.port)")
+        log(locf("Preparing %@ · %@:%d", server.type.rawValue, server.host, server.port))
         do {
             let config = try XrayConfigBuilder.make(
                 server: server,
@@ -528,7 +538,7 @@ final class AppStore: ObservableObject {
             process.terminationHandler = { [weak self] task in
                 Task { @MainActor in
                     guard let self, self.state.connected else { return }
-                    self.state = .failed("Xray exited with code \(task.terminationStatus)")
+                    self.state = .failed(locf("Xray exited with code %d", task.terminationStatus))
                     self.restoreSystemProxy()
                 }
             }
@@ -541,14 +551,14 @@ final class AppStore: ObservableObject {
                     return
                 }
                 guard process.isRunning else {
-                    state = .failed("Configuration failed to start")
+                    state = .failed(loc("Configuration failed to start"))
                     return
                 }
                 guard ready else {
                     process.terminate()
                     xrayProcess = nil
-                    state = .failed("The local proxy did not open port \(settings.localHTTPPort)")
-                    log("Xray is running, but port \(settings.localHTTPPort) is unavailable")
+                    state = .failed(locf("The local proxy did not open port %d", settings.localHTTPPort))
+                    log(locf("Xray is running, but port %d is unavailable", settings.localHTTPPort))
                     return
                 }
                 if settings.mode == .tun {
@@ -563,8 +573,8 @@ final class AppStore: ObservableObject {
                     guard systemProxyIsEnabled() else {
                         process.terminate()
                         xrayProcess = nil
-                        state = .failed("macOS did not allow System Proxy to be enabled")
-                        log("Could not apply System Proxy settings")
+                        state = .failed(loc("macOS did not allow System Proxy to be enabled"))
+                        log(loc("Could not apply System Proxy settings"))
                         return
                     }
                 }
@@ -573,11 +583,11 @@ final class AppStore: ObservableObject {
                 connectionAttemptID = nil
                 startStats()
                 save()
-                log("Connected")
+                log(loc("Connected"))
             }
         } catch {
             state = .failed(error.localizedDescription)
-            log("Error: \(error.localizedDescription)")
+            log(locf("Error: %@", error.localizedDescription))
         }
     }
 
@@ -617,7 +627,7 @@ final class AppStore: ObservableObject {
         upRate = 0
         if !silent {
             state = .disconnected
-            log("Disconnected")
+            log(loc("Disconnected"))
         }
     }
 
@@ -696,7 +706,7 @@ final class AppStore: ObservableObject {
     func recoverProxyIfNeeded() {
         guard FileManager.default.fileExists(atPath: supportURL.appendingPathComponent("proxy-backup.json").path) else { return }
         restoreSystemProxy()
-        log("Restored system proxy settings after the previous shutdown")
+        log(loc("Restored system proxy settings after the previous shutdown"))
     }
 
     private func captureSystemProxy() {
@@ -737,7 +747,7 @@ final class AppStore: ObservableObject {
 
     private func startTun() async throws {
         guard Bundle.main.url(forResource: "sing-box", withExtension: nil) != nil else {
-            throw NSError(domain: "materialTun", code: 2, userInfo: [NSLocalizedDescriptionKey: "sing-box engine not found"])
+            throw NSError(domain: "materialTun", code: 2, userInfo: [NSLocalizedDescriptionKey: loc("sing-box engine not found")])
         }
         let configURL = supportURL.appendingPathComponent("runtime-tun.json")
         var tunRules = [[String: Any]]()
@@ -799,7 +809,7 @@ final class AppStore: ObservableObject {
             .appendingPathComponent("Contents/Library/HelperTools/materialTunHelper") as URL?,
               FileManager.default.isExecutableFile(atPath: bundledHelper.path),
               let bundledSingBox = Bundle.main.url(forResource: "sing-box", withExtension: nil) else {
-            throw NSError(domain: "materialTun", code: 5, userInfo: [NSLocalizedDescriptionKey: "The system helper is missing from the application"])
+            throw NSError(domain: "materialTun", code: 5, userInfo: [NSLocalizedDescriptionKey: loc("The system helper is missing from the application")])
         }
 
         let plist = """
@@ -855,7 +865,7 @@ final class AppStore: ObservableObject {
             }
         }.value
         guard result.0 == 0 else {
-            throw NSError(domain: "materialTun", code: 6, userInfo: [NSLocalizedDescriptionKey: "Could not install the helper: \(result.1)"])
+            throw NSError(domain: "materialTun", code: 6, userInfo: [NSLocalizedDescriptionKey: locf("Could not install the helper: %@", result.1)])
         }
         try? await Task.sleep(for: .milliseconds(500))
     }
@@ -882,7 +892,7 @@ final class AppStore: ObservableObject {
             }
             try? await Task.sleep(for: .milliseconds(100))
         }
-        throw NSError(domain: "materialTun", code: 8, userInfo: [NSLocalizedDescriptionKey: "The system helper did not respond"])
+        throw NSError(domain: "materialTun", code: 8, userInfo: [NSLocalizedDescriptionKey: loc("The system helper did not respond")])
     }
 
     private func shell(_ executable: String, _ arguments: [String]) -> String {
