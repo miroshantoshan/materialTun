@@ -23,13 +23,19 @@
 
 ## Install
 
-The recommended installation method is the bundled `install.command` installer. Download it and open it from Finder, or run:
+Download the installer from the [materialTun Releases](https://github.com/miroshantoshan/materialTun/releases) page:
+
+1. Open the newest release.
+2. Expand the **Assets** section.
+3. Download **`install.command`**.
+4. Open Terminal and run:
 
 ```bash
-curl -fsSLO https://raw.githubusercontent.com/miroshantoshan/materialTun/main/install.command
-chmod +x install.command
-./install.command
+chmod +x ~/Downloads/install.command
+~/Downloads/install.command
 ```
+
+The `chmod` command is required because macOS may remove executable permissions from files downloaded through a browser. You can also right-click `install.command` in Finder and choose **Open** after making it executable.
 
 The installer automatically:
 
