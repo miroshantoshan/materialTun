@@ -6,8 +6,6 @@ set -o pipefail
 REPOSITORY_ARCHIVE="https://codeload.github.com/miroshantoshan/materialTun/tar.gz/refs/heads/main"
 REPOSITORY_ARCHIVE_FALLBACK="https://github.com/miroshantoshan/materialTun/archive/refs/heads/main.tar.gz"
 SING_BOX_LATEST_RELEASE="https://github.com/SagerNet/sing-box/releases/latest"
-GEO_RELEASE_BASE="https://github.com/Loyalsoldier/v2ray-rules-dat/releases/latest/download"
-GEO_MIRROR_BASE="https://cdn.jsdelivr.net/gh/Loyalsoldier/v2ray-rules-dat@release"
 USER_APPS_DIR="$HOME/Applications"
 TARGET_APP="$USER_APPS_DIR/materialTun.app"
 WORK_DIR="$(mktemp -d -t materialtun-installer)"
@@ -16,6 +14,7 @@ ARCHIVE_PATH="$WORK_DIR/materialTun.tar.gz"
 PROJECT_DIR="$WORK_DIR/materialTun-main"
 SOURCE_APP="$WORK_DIR/materialTun.app"
 RUNTIME_DIR="$WORK_DIR/runtime"
+STATUS_FILE="$WORK_DIR/status"
 
 if [[ -d /Applications/Xcode.app/Contents/Developer ]] && \
     DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcrun --find swiftc >/dev/null 2>&1; then
@@ -116,13 +115,26 @@ run_with_spinner() {
     local frames=("⠋" "⠙" "⠹" "⠸" "⠼" "⠴" "⠦" "⠧" "⠇" "⠏")
     local frame=1
     local started=$SECONDS
+    local current_label status_line status_path bytes megabytes
 
     : >"$LOG_FILE"
+    : >"$STATUS_FILE"
     "$@" >"$LOG_FILE" 2>&1 &
     local task_pid=$!
 
     while kill -0 "$task_pid" 2>/dev/null || (( SECONDS - started < minimum_seconds )); do
-        print -n -- "\r\e[K${LIGHT_PURPLE}      ${frames[$frame]} $label · $((SECONDS - started))s${RESET}"
+        current_label="$label"
+        if [[ -s "$STATUS_FILE" ]]; then
+            status_line="$(<"$STATUS_FILE")"
+            current_label="${status_line%%|*}"
+            status_path="${status_line#*|}"
+            if [[ "$status_path" != "$status_line" && -f "$status_path" ]]; then
+                bytes="$(stat -f %z "$status_path" 2>/dev/null || print 0)"
+                megabytes=$(( bytes / 1024 / 1024 ))
+                current_label="$current_label · ${megabytes} MB"
+            fi
+        fi
+        print -n -- "\r\e[K${LIGHT_PURPLE}      ${frames[$frame]} $current_label · $((SECONDS - started))s${RESET}"
         frame=$((frame % ${#frames[@]} + 1))
         sleep 0.12
     done
@@ -181,26 +193,29 @@ download_file() {
     local destination="$3"
     local fallback="${4:-}"
 
+    print -r -- "Downloading $label|$destination" >"$STATUS_FILE"
     print -- "Downloading $label..."
     if curl --fail --location --silent --show-error \
         --user-agent "materialTun-Installer/2.0" \
         --header "Accept: application/octet-stream" \
-        --connect-timeout 15 --max-time 300 \
-        --retry 3 --retry-delay 2 --retry-all-errors \
+        --connect-timeout 10 --max-time 180 \
+        --retry 1 --retry-delay 1 \
         "$url" --output "$destination"; then
         return 0
     fi
 
     [[ -n "$fallback" ]] || return 1
+    print -r -- "Trying mirror for $label|$destination" >"$STATUS_FILE"
     print -- "Primary source failed. Trying the mirror for $label..."
     curl --fail --location --silent --show-error \
         --user-agent "materialTun-Installer/2.0" \
-        --connect-timeout 15 --max-time 300 \
-        --retry 3 --retry-delay 2 --retry-all-errors \
+        --connect-timeout 10 --max-time 180 \
+        --retry 1 --retry-delay 1 \
         "$fallback" --output "$destination"
 }
 
 download_source() {
+    print -r -- "Downloading source code|$ARCHIVE_PATH" >"$STATUS_FILE"
     print -- "Downloading materialTun source from GitHub codeload..."
     if curl --fail --location --silent --show-error \
         --user-agent "materialTun-Installer/2.0" \
@@ -211,6 +226,7 @@ download_source() {
     fi
 
     print -- "The direct source endpoint failed. Trying the GitHub archive URL..."
+    print -r -- "Trying source mirror|$ARCHIVE_PATH" >"$STATUS_FILE"
     curl --fail --location --silent --show-error \
         --user-agent "materialTun-Installer/2.0" \
         --connect-timeout 10 --max-time 60 \
@@ -243,7 +259,11 @@ download_runtime() {
         "$WORK_DIR/xray.zip" || return 1
     ditto -x -k "$WORK_DIR/xray.zip" "$RUNTIME_DIR/xray" || return 1
     [[ -x "$RUNTIME_DIR/xray/xray" ]] || chmod +x "$RUNTIME_DIR/xray/xray" || return 1
+    [[ -f "$RUNTIME_DIR/xray/geoip.dat" && -f "$RUNTIME_DIR/xray/geosite.dat" ]] || return 1
+    ditto "$RUNTIME_DIR/xray/geoip.dat" "$RUNTIME_DIR/geoip.dat" || return 1
+    ditto "$RUNTIME_DIR/xray/geosite.dat" "$RUNTIME_DIR/geosite.dat" || return 1
 
+    print -r -- "Resolving sing-box version|" >"$STATUS_FILE"
     print -- "Resolving the latest sing-box version..."
     latest_release_url="$(curl --fail --location --silent --show-error \
         --user-agent "materialTun-Installer/2.0" \
@@ -261,12 +281,6 @@ download_runtime() {
     find "$RUNTIME_DIR/sing-box" -type f -name sing-box -perm +111 -print -quit >"$WORK_DIR/sing-box-path"
     [[ -s "$WORK_DIR/sing-box-path" ]] || return 1
 
-    download_file "GeoIP rules" \
-        "$GEO_RELEASE_BASE/geoip.dat" "$RUNTIME_DIR/geoip.dat" \
-        "$GEO_MIRROR_BASE/geoip.dat" || return 1
-    download_file "GeoSite rules" \
-        "$GEO_RELEASE_BASE/geosite.dat" "$RUNTIME_DIR/geosite.dat" \
-        "$GEO_MIRROR_BASE/geosite.dat" || return 1
 }
 
 build_application() {
@@ -333,7 +347,7 @@ tar -xzf "$ARCHIVE_PATH" -C "$WORK_DIR" >"$LOG_FILE" 2>&1 \
 [[ -f "$PROJECT_DIR/Package.swift" ]] || fail "The downloaded project is incomplete or has an unexpected structure."
 print ""
 
-step "2/5" "Connection components" "Downloading Xray, sing-box, and current Geo rules"
+step "2/5" "Connection components" "Downloading Xray and sing-box (Geo rules are included with Xray)"
 run_with_spinner "Preparing connection components..." 4 download_runtime \
     || fail "Could not download the connection components."
 print ""
