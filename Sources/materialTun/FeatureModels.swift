@@ -14,8 +14,8 @@ enum LatencyMethod: String, Codable, CaseIterable, Identifiable {
 }
 
 enum ProfileSort: String, CaseIterable, Identifiable {
-    case name = "Имя"
-    case latency = "Задержка"
+    case name = "Name"
+    case latency = "Latency"
     var id: String { rawValue }
 }
 
@@ -63,13 +63,21 @@ extension AppStore {
         if let data = try? Data(contentsOf: workspaceURL),
            let decoded = try? JSONDecoder().decode([VPNWorkspace].self, from: data),
            !decoded.isEmpty {
-            workspaces = decoded
+            workspaces = decoded.map { workspace in
+                var migrated = workspace
+                if migrated.name == "\u{41B}\u{438}\u{447}\u{43D}\u{44B}\u{439}" {
+                    migrated.name = "Personal"
+                } else if migrated.name == "\u{41D}\u{43E}\u{432}\u{44B}\u{439} \u{43F}\u{440}\u{43E}\u{444}\u{438}\u{43B}\u{44C}" {
+                    migrated.name = "New Workspace"
+                }
+                return migrated
+            }
             let savedID = UserDefaults.standard.string(forKey: "materialTunActiveWorkspace").flatMap(UUID.init(uuidString:))
-            activeWorkspaceID = decoded.contains(where: { $0.id == savedID }) ? savedID : decoded[0].id
+            activeWorkspaceID = workspaces.contains(where: { $0.id == savedID }) ? savedID : workspaces[0].id
             loadWorkspace(activeWorkspaceID!)
         } else {
             let workspace = VPNWorkspace(
-                name: "Личный",
+                name: "Personal",
                 colorHex: "6750A4",
                 servers: servers,
                 subscriptions: subscriptions,
@@ -120,13 +128,13 @@ extension AppStore {
         activeWorkspaceID = id
         loadWorkspace(id)
         save()
-        showToast("Профиль переключён")
+        showToast("Workspace switched")
     }
 
     func createWorkspace(name: String, colorHex: String) {
         persistActiveWorkspace()
         let workspace = VPNWorkspace(
-            name: name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "Новый профиль" : name,
+            name: name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "New Workspace" : name,
             colorHex: colorHex,
             servers: [],
             subscriptions: [],
@@ -197,13 +205,13 @@ extension AppStore {
         }
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(value, forType: .string)
-        showToast("\(format) скопирован")
+        showToast("\(format) copied")
     }
 
     func saveProfileQR(_ server: ServerProfile) {
         guard let data = server.rawURI.data(using: .utf8),
               let filter = CIFilter(name: "CIQRCodeGenerator") else {
-            showToast("Не удалось создать QR")
+            showToast("Could not create QR code")
             return
         }
         filter.setValue(data, forKey: "inputMessage")
@@ -219,7 +227,7 @@ extension AppStore {
         panel.nameFieldStringValue = "\(server.name)-QR.png"
         panel.allowedContentTypes = [.png]
         if panel.runModal() == .OK, let url = panel.url {
-            do { try png.write(to: url, options: .atomic); showToast("QR сохранён") }
+            do { try png.write(to: url, options: .atomic); showToast("QR code saved") }
             catch { showToast(error.localizedDescription) }
         }
     }
@@ -255,18 +263,18 @@ extension AppStore {
                 }
             }
             save()
-            showToast("Проверка завершена")
+            showToast("Latency test completed")
         }
     }
 
     func selectFastest() {
         guard let fastest = servers.filter({ ($0.ping ?? 0) > 0 }).min(by: { ($0.ping ?? .max) < ($1.ping ?? .max) }) else {
-            showToast("Сначала проверьте задержку")
+            showToast("Test latency first")
             return
         }
         selectedServerID = fastest.id
         save()
-        showToast("Выбран \(fastest.name) · \(fastest.ping ?? 0) мс")
+        showToast("Selected \(fastest.name) · \(fastest.ping ?? 0) ms")
     }
 
     func refreshSubscriptionEnhanced(_ subscription: Subscription) async {
@@ -280,7 +288,7 @@ extension AppStore {
                 throw NSError(
                     domain: "materialTun.Subscription",
                     code: 403,
-                    userInfo: [NSLocalizedDescriptionKey: "Провайдер отклонил VPN-клиент"]
+                    userInfo: [NSLocalizedDescriptionKey: "The provider rejected this VPN client"]
                 )
             }
             let parsed = result.profiles
@@ -288,7 +296,7 @@ extension AppStore {
                 throw NSError(
                     domain: "materialTun.Subscription",
                     code: 422,
-                    userInfo: [NSLocalizedDescriptionKey: "В подписке нет поддерживаемых конфигураций"]
+                    userInfo: [NSLocalizedDescriptionKey: "The subscription contains no supported configurations"]
                 )
             }
             replaceProfiles(parsed, for: subscription.id)
@@ -311,12 +319,12 @@ extension AppStore {
                 subscriptionDetails[subscription.id] = details
             }
             save()
-            showToast("Обновлено \(count) конфигураций")
+            showToast("Updated \(count) configurations")
         } catch {
             var details = subscriptionDetails[subscription.id] ?? SubscriptionDetails()
             details.lastError = error.localizedDescription
             subscriptionDetails[subscription.id] = details
-            showToast("Ошибка обновления")
+            showToast("Update failed")
         }
     }
 
@@ -453,11 +461,11 @@ extension AppStore {
               let image = CIImage(contentsOf: url),
               let detector = CIDetector(ofType: CIDetectorTypeQRCode, context: nil),
               let message = detector.features(in: image).compactMap({ ($0 as? CIQRCodeFeature)?.messageString }).first else {
-            showToast("QR-код не найден")
+            showToast("QR code not found")
             return
         }
         let count = addProfiles(from: message)
-        showToast(count > 0 ? "QR импортирован" : "QR не содержит конфигурацию")
+        showToast(count > 0 ? "QR code imported" : "QR code contains no configuration")
     }
 
     func backup(to url: URL) throws {
@@ -497,14 +505,14 @@ extension AppStore {
     }
 
     func checkForUpdates() async {
-        updateStatus = "Проверяем…"
+        updateStatus = "Checking…"
         guard let url = URL(string: "https://api.github.com/repos/palazik/palazikVPN/releases/latest") else { return }
         do {
             let (data, _) = try await URLSession.shared.data(from: url)
             let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
-            updateStatus = json?["tag_name"].map { "Последняя версия: \($0)" } ?? "Релизов пока нет"
+            updateStatus = json?["tag_name"].map { "Latest version: \($0)" } ?? "No releases yet"
         } catch {
-            updateStatus = "Не удалось проверить"
+            updateStatus = "Could not check for updates"
         }
     }
 
@@ -514,7 +522,7 @@ extension AppStore {
             (geoSiteURL, "geosite.dat")
         ].filter { !$0.0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
         guard !targets.isEmpty else {
-            showToast("Укажите URL Geo-файлов")
+            showToast("Enter the Geo file URLs")
             return
         }
         let folder = supportURL.appendingPathComponent("geo", isDirectory: true)
@@ -528,7 +536,7 @@ extension AppStore {
                 }
                 try data.write(to: folder.appendingPathComponent(name), options: .atomic)
             }
-            showToast("Geo-файлы обновлены")
+            showToast("Geo files updated")
         } catch {
             showToast("Geo: \(error.localizedDescription)")
         }
@@ -541,11 +549,11 @@ extension AppStore {
 
     func connectWithSingBox(_ server: ServerProfile) {
         guard settings.mode == .systemProxy else {
-            state = .failed("Для этого протокола пока выберите «Системный прокси»")
+            state = .failed("Select System Proxy for this protocol")
             return
         }
         guard let binary = Bundle.main.url(forResource: "sing-box", withExtension: nil) else {
-            state = .failed("sing-box не найден")
+            state = .failed("sing-box not found")
             return
         }
         disconnect(silent: true)
@@ -569,13 +577,13 @@ extension AppStore {
             Task {
                 try? await Task.sleep(for: .milliseconds(700))
                 guard process.isRunning else {
-                    state = .failed("sing-box не запустился")
+                    state = .failed("sing-box failed to start")
                     return
                 }
                 applySystemProxy()
                 state = .connected(Date())
                 startStats()
-                log("Подключено через sing-box")
+                log("Connected through sing-box")
             }
         } catch {
             state = .failed(error.localizedDescription)
@@ -659,7 +667,7 @@ enum SingBoxConfigBuilder {
             outbound["peer_public_key"] = query["public_key"] ?? query["peer_public_key"] ?? ""
             outbound["local_address"] = (query["address"] ?? "172.16.0.2/32").split(separator: ",").map(String.init)
         default:
-            throw NSError(domain: "materialTun", code: 40, userInfo: [NSLocalizedDescriptionKey: "Неподдерживаемый sing-box профиль"])
+            throw NSError(domain: "materialTun", code: 40, userInfo: [NSLocalizedDescriptionKey: "Unsupported sing-box profile"])
         }
         let config: [String: Any] = [
             "log": ["level": settings.logLevel],

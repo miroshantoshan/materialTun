@@ -19,9 +19,9 @@ private extension String {
 }
 
 enum AppTab: String, CaseIterable {
-    case home = "Главная"
-    case servers = "Серверы"
-    case settings = "Настройки"
+    case home = "Home"
+    case servers = "Servers"
+    case settings = "Settings"
 
     var icon: String {
         switch self {
@@ -67,16 +67,45 @@ enum ProxyProtocol: String, Codable, CaseIterable, Sendable {
 }
 
 enum ConnectionMode: String, Codable, CaseIterable, Identifiable {
-    case systemProxy = "Системный прокси"
+    case systemProxy = "System Proxy"
     case tun = "TUN"
     var id: String { rawValue }
+
+    init(from decoder: Decoder) throws {
+        let value = try decoder.singleValueContainer().decode(String.self)
+        switch value {
+        case "System Proxy", "\u{421}\u{438}\u{441}\u{442}\u{435}\u{43C}\u{43D}\u{44B}\u{439} \u{43F}\u{440}\u{43E}\u{43A}\u{441}\u{438}": self = .systemProxy
+        case "TUN": self = .tun
+        default: throw DecodingError.dataCorruptedError(in: try decoder.singleValueContainer(), debugDescription: "Unknown connection mode: \(value)")
+        }
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        try container.encode(rawValue)
+    }
 }
 
 enum RouteMode: String, Codable, CaseIterable, Identifiable {
-    case global = "Глобально"
-    case rules = "По правилам"
-    case direct = "Напрямую"
+    case global = "Global"
+    case rules = "Rules"
+    case direct = "Direct"
     var id: String { rawValue }
+
+    init(from decoder: Decoder) throws {
+        let value = try decoder.singleValueContainer().decode(String.self)
+        switch value {
+        case "Global", "\u{413}\u{43B}\u{43E}\u{431}\u{430}\u{43B}\u{44C}\u{43D}\u{43E}": self = .global
+        case "Rules", "\u{41F}\u{43E} \u{43F}\u{440}\u{430}\u{432}\u{438}\u{43B}\u{430}\u{43C}": self = .rules
+        case "Direct", "\u{41D}\u{430}\u{43F}\u{440}\u{44F}\u{43C}\u{443}\u{44E}": self = .direct
+        default: throw DecodingError.dataCorruptedError(in: try decoder.singleValueContainer(), debugDescription: "Unknown route mode: \(value)")
+        }
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        try container.encode(rawValue)
+    }
 }
 
 struct ServerProfile: Codable, Identifiable, Hashable, Sendable {
@@ -162,11 +191,11 @@ enum ConnectionState: Equatable {
 
     var title: String {
         switch self {
-        case .disconnected: "Не подключено"
-        case .connecting: "Подключение…"
-        case .connected: "Защищено"
-        case .disconnecting: "Отключение…"
-        case .failed: "Ошибка"
+        case .disconnected: "Disconnected"
+        case .connecting: "Connecting…"
+        case .connected: "Protected"
+        case .disconnecting: "Disconnecting…"
+        case .failed: "Error"
         }
     }
 
@@ -329,26 +358,26 @@ final class AppStore: ObservableObject {
             defer { url.stopAccessingSecurityScopedResource() }
             if let text = try? String(contentsOf: url, encoding: .utf8) { count += addProfiles(from: text) }
         }
-        showToast(count > 0 ? "Добавлено серверов: \(count)" : "Поддерживаемые конфигурации не найдены")
+        showToast(count > 0 ? "Servers added: \(count)" : "No supported configurations found")
     }
 
     func addSubscription(name: String, url: String) async {
         guard let remote = URL(string: url), ["http", "https"].contains(remote.scheme?.lowercased() ?? "") else {
-            showToast("Некорректная ссылка подписки")
+            showToast("Invalid subscription URL")
             return
         }
-        var item = Subscription(name: name.isEmpty ? (remote.host?.replacingOccurrences(of: "www.", with: "") ?? "Подписка") : name, url: url)
+        var item = Subscription(name: name.isEmpty ? (remote.host?.replacingOccurrences(of: "www.", with: "") ?? "Subscription") : name, url: url)
         subscriptions.append(item)
         do {
             let (data, response) = try await URLSession.shared.data(for: subscriptionRequest(url: remote))
             let text = String(data: data, encoding: .utf8) ?? ""
             let result = await parseSubscription(text, subscriptionID: item.id)
             guard !result.isRejected else {
-                throw NSError(domain: "materialTun.Subscription", code: 403, userInfo: [NSLocalizedDescriptionKey: "Провайдер отклонил клиент"])
+                throw NSError(domain: "materialTun.Subscription", code: 403, userInfo: [NSLocalizedDescriptionKey: "The provider rejected this client"])
             }
             let parsed = result.profiles
             guard !parsed.isEmpty else {
-                throw NSError(domain: "materialTun.Subscription", code: 422, userInfo: [NSLocalizedDescriptionKey: "В подписке нет поддерживаемых конфигураций"])
+                throw NSError(domain: "materialTun.Subscription", code: 422, userInfo: [NSLocalizedDescriptionKey: "The subscription contains no supported configurations"])
             }
             mergeProfiles(parsed)
             let count = parsed.count
@@ -360,10 +389,10 @@ final class AppStore: ObservableObject {
             }
             if let i = subscriptions.firstIndex(where: { $0.id == item.id }) { subscriptions[i] = item }
             save()
-            showToast("Подписка добавлена · \(count) серверов")
+            showToast("Subscription added · \(count) servers")
         } catch {
             save()
-            showToast("Подписка сохранена, но пока недоступна")
+            showToast("Subscription saved, but currently unavailable")
         }
     }
 
@@ -374,11 +403,11 @@ final class AppStore: ObservableObject {
             let text = String(data: data, encoding: .utf8) ?? ""
             let result = await parseSubscription(text, subscriptionID: subscription.id)
             guard !result.isRejected else {
-                throw NSError(domain: "materialTun.Subscription", code: 403, userInfo: [NSLocalizedDescriptionKey: "Провайдер отклонил клиент"])
+                throw NSError(domain: "materialTun.Subscription", code: 403, userInfo: [NSLocalizedDescriptionKey: "The provider rejected this client"])
             }
             let parsed = result.profiles
             guard !parsed.isEmpty else {
-                throw NSError(domain: "materialTun.Subscription", code: 422, userInfo: [NSLocalizedDescriptionKey: "В подписке нет поддерживаемых конфигураций"])
+                throw NSError(domain: "materialTun.Subscription", code: 422, userInfo: [NSLocalizedDescriptionKey: "The subscription contains no supported configurations"])
             }
             replaceProfiles(parsed, for: subscription.id)
             let count = parsed.count
@@ -390,9 +419,9 @@ final class AppStore: ObservableObject {
                 }
             }
             save()
-            showToast("Обновлено \(count) конфигураций")
+            showToast("Updated \(count) configurations")
         } catch {
-            showToast("Не удалось обновить подписку")
+            showToast("Could not update subscription")
         }
     }
 
@@ -452,7 +481,7 @@ final class AppStore: ObservableObject {
 
     func connect() {
         guard let server = selectedServer else {
-            showToast("Сначала добавьте и выберите сервер")
+            showToast("Add and select a server first")
             tab = .servers
             return
         }
@@ -461,7 +490,7 @@ final class AppStore: ObservableObject {
             return
         }
         guard let xray = Bundle.main.url(forResource: "xray", withExtension: nil) else {
-            state = .failed("Движок Xray не найден")
+            state = .failed("Xray engine not found")
             return
         }
         disconnect(silent: true)
@@ -469,7 +498,7 @@ final class AppStore: ObservableObject {
         let attemptID = UUID()
         connectionAttemptID = attemptID
         state = .connecting
-        log("Подготовка \(server.type.rawValue) · \(server.host):\(server.port)")
+        log("Preparing \(server.type.rawValue) · \(server.host):\(server.port)")
         do {
             let config = try XrayConfigBuilder.make(
                 server: server,
@@ -499,7 +528,7 @@ final class AppStore: ObservableObject {
             process.terminationHandler = { [weak self] task in
                 Task { @MainActor in
                     guard let self, self.state.connected else { return }
-                    self.state = .failed("Xray завершился с кодом \(task.terminationStatus)")
+                    self.state = .failed("Xray exited with code \(task.terminationStatus)")
                     self.restoreSystemProxy()
                 }
             }
@@ -512,14 +541,14 @@ final class AppStore: ObservableObject {
                     return
                 }
                 guard process.isRunning else {
-                    state = .failed("Конфигурация не запустилась")
+                    state = .failed("Configuration failed to start")
                     return
                 }
                 guard ready else {
                     process.terminate()
                     xrayProcess = nil
-                    state = .failed("Локальный прокси не открыл порт \(settings.localHTTPPort)")
-                    log("Xray запущен, но порт \(settings.localHTTPPort) недоступен")
+                    state = .failed("The local proxy did not open port \(settings.localHTTPPort)")
+                    log("Xray is running, but port \(settings.localHTTPPort) is unavailable")
                     return
                 }
                 if settings.mode == .tun {
@@ -534,8 +563,8 @@ final class AppStore: ObservableObject {
                     guard systemProxyIsEnabled() else {
                         process.terminate()
                         xrayProcess = nil
-                        state = .failed("macOS не разрешила включить системный прокси")
-                        log("Не удалось применить системный прокси")
+                        state = .failed("macOS did not allow System Proxy to be enabled")
+                        log("Could not apply System Proxy settings")
                         return
                     }
                 }
@@ -544,11 +573,11 @@ final class AppStore: ObservableObject {
                 connectionAttemptID = nil
                 startStats()
                 save()
-                log("Подключено")
+                log("Connected")
             }
         } catch {
             state = .failed(error.localizedDescription)
-            log("Ошибка: \(error.localizedDescription)")
+            log("Error: \(error.localizedDescription)")
         }
     }
 
@@ -588,7 +617,7 @@ final class AppStore: ObservableObject {
         upRate = 0
         if !silent {
             state = .disconnected
-            log("Отключено")
+            log("Disconnected")
         }
     }
 
@@ -667,7 +696,7 @@ final class AppStore: ObservableObject {
     func recoverProxyIfNeeded() {
         guard FileManager.default.fileExists(atPath: supportURL.appendingPathComponent("proxy-backup.json").path) else { return }
         restoreSystemProxy()
-        log("Восстановлены системные настройки прокси после прошлого завершения")
+        log("Restored system proxy settings after the previous shutdown")
     }
 
     private func captureSystemProxy() {
@@ -708,7 +737,7 @@ final class AppStore: ObservableObject {
 
     private func startTun() async throws {
         guard Bundle.main.url(forResource: "sing-box", withExtension: nil) != nil else {
-            throw NSError(domain: "materialTun", code: 2, userInfo: [NSLocalizedDescriptionKey: "Движок sing-box не найден"])
+            throw NSError(domain: "materialTun", code: 2, userInfo: [NSLocalizedDescriptionKey: "sing-box engine not found"])
         }
         let configURL = supportURL.appendingPathComponent("runtime-tun.json")
         var tunRules = [[String: Any]]()
@@ -770,7 +799,7 @@ final class AppStore: ObservableObject {
             .appendingPathComponent("Contents/Library/HelperTools/materialTunHelper") as URL?,
               FileManager.default.isExecutableFile(atPath: bundledHelper.path),
               let bundledSingBox = Bundle.main.url(forResource: "sing-box", withExtension: nil) else {
-            throw NSError(domain: "materialTun", code: 5, userInfo: [NSLocalizedDescriptionKey: "Системный helper отсутствует в приложении"])
+            throw NSError(domain: "materialTun", code: 5, userInfo: [NSLocalizedDescriptionKey: "The system helper is missing from the application"])
         }
 
         let plist = """
@@ -826,7 +855,7 @@ final class AppStore: ObservableObject {
             }
         }.value
         guard result.0 == 0 else {
-            throw NSError(domain: "materialTun", code: 6, userInfo: [NSLocalizedDescriptionKey: "Не удалось установить helper: \(result.1)"])
+            throw NSError(domain: "materialTun", code: 6, userInfo: [NSLocalizedDescriptionKey: "Could not install the helper: \(result.1)"])
         }
         try? await Task.sleep(for: .milliseconds(500))
     }
@@ -847,13 +876,13 @@ final class AppStore: ObservableObject {
                     throw NSError(
                         domain: "materialTun",
                         code: 7,
-                        userInfo: [NSLocalizedDescriptionKey: status.message ?? log.ifEmpty("TUN не запустился")]
+                        userInfo: [NSLocalizedDescriptionKey: status.message ?? log.ifEmpty("TUN failed to start")]
                     )
                 }
             }
             try? await Task.sleep(for: .milliseconds(100))
         }
-        throw NSError(domain: "materialTun", code: 8, userInfo: [NSLocalizedDescriptionKey: "Системный helper не ответил"])
+        throw NSError(domain: "materialTun", code: 8, userInfo: [NSLocalizedDescriptionKey: "The system helper did not respond"])
     }
 
     private func shell(_ executable: String, _ arguments: [String]) -> String {
@@ -1127,7 +1156,7 @@ enum XrayConfigBuilder {
         case .socks: outbound = try socks(server.rawURI)
         case .http: outbound = try http(server.rawURI)
         case .hysteria2, .tuic, .wireguard, .anytls:
-            throw badConfig("Этот протокол запускается через sing-box")
+            throw badConfig("This protocol runs through sing-box")
         case .raw: return [:]
         }
         if options.mux { outbound["mux"] = ["enabled": true, "concurrency": 8] }
@@ -1248,7 +1277,7 @@ enum XrayConfigBuilder {
     }
 
     private static func badConfig(_ name: String) -> NSError {
-        NSError(domain: "materialTun", code: 1, userInfo: [NSLocalizedDescriptionKey: "Некорректная конфигурация \(name)"])
+        NSError(domain: "materialTun", code: 1, userInfo: [NSLocalizedDescriptionKey: "Invalid \(name) configuration"])
     }
 }
 
@@ -1320,7 +1349,7 @@ struct RootView: View {
         .onOpenURL { url in
             if ["vless", "vmess", "trojan", "ss", "socks", "socks5"].contains(url.scheme?.lowercased() ?? "") {
                 let count = store.addProfiles(from: url.absoluteString)
-                store.showToast(count > 0 ? "Конфигурация добавлена" : "Ссылка не распознана")
+                store.showToast(count > 0 ? "Configuration added" : "Link not recognized")
                 store.tab = .servers
             } else if url.isFileURL {
                 store.importFiles([url])
@@ -1516,14 +1545,14 @@ struct HomeView: View {
         return String(format: "%02d:%02d", seconds / 60, seconds % 60)
     }
     private func pingText(_ ping: Int?) -> String {
-        guard let ping else { return "Пинг" }
+        guard let ping else { return "Ping" }
         if ping == -1 { return "…" }
         if ping == 0 { return "—" }
-        return "\(ping) мс"
+        return "\(ping) ms"
     }
     private func formatRate(_ value: Double) -> String {
-        if value > 1_000_000 { return String(format: "%.1f МБ/с", value / 1_000_000) }
-        return String(format: "%.0f КБ/с", value / 1_000)
+        if value > 1_000_000 { return String(format: "%.1f MB/s", value / 1_000_000) }
+        return String(format: "%.0f KB/s", value / 1_000)
     }
 }
 
@@ -1674,12 +1703,12 @@ struct ServersView: View {
                 }
                 Spacer()
                 Button { store.pingAll() } label: { Image(systemName: "network") }
-                    .help("Проверить все серверы")
+                    .help("Test all servers")
                     .buttonStyle(PalazikIconButton())
                 Menu {
-                    Button("Вставить конфигурацию") { showingAdd = true }
-                    Button("Добавить подписку") { showingSubscription = true }
-                    Button("Импортировать файл…") { openFiles() }
+                    Button("Paste Configuration") { showingAdd = true }
+                    Button("Add Subscription") { showingSubscription = true }
+                    Button("Import File…") { openFiles() }
                 } label: {
                     Label("Import profile", systemImage: "plus")
                         .font(.system(size: 14, weight: .semibold))
@@ -1738,7 +1767,7 @@ struct ServersView: View {
                     Image(systemName: "link.circle.fill").foregroundStyle(.purple)
                     VStack(alignment: .leading, spacing: 2) {
                         Text(sub.name).font(.system(size: 13, weight: .semibold))
-                        Text(sub.lastUpdated?.formatted(date: .abbreviated, time: .shortened) ?? "Не обновлялась")
+                        Text(sub.lastUpdated?.formatted(date: .abbreviated, time: .shortened) ?? "Never updated")
                             .font(.caption2).foregroundStyle(.secondary)
                     }
                     Spacer()
@@ -1808,19 +1837,19 @@ struct ServerRow: View {
                 Spacer()
                 pingView
                 Menu {
-                    Button(server.favorite ? "Убрать из избранного" : "В избранное") {
+                    Button(server.favorite ? "Remove from Favorites" : "Add to Favorites") {
                         if let i = store.servers.firstIndex(where: { $0.id == server.id }) {
                             store.servers[i].favorite.toggle(); store.save()
                         }
                     }
-                    Button("Проверить пинг") { store.ping(server.id) }
-                    Button("Переименовать") { editingServer = server }
-                    Button("Копировать ссылку") {
+                    Button("Test Ping") { store.ping(server.id) }
+                    Button("Rename") { editingServer = server }
+                    Button("Copy Link") {
                         NSPasteboard.general.clearContents()
                         NSPasteboard.general.setString(server.rawURI, forType: .string)
                     }
                     Divider()
-                    Button("Удалить", role: .destructive) {
+                    Button("Delete", role: .destructive) {
                         store.servers.removeAll { $0.id == server.id }
                         if store.selectedServerID == server.id { store.selectedServerID = store.servers.first?.id }
                         store.save()
@@ -1876,8 +1905,8 @@ struct AddConfigSheet: View {
     @State private var text = ""
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text("Добавить конфигурацию").font(.title2.bold())
-            Text("Вставьте одну или несколько ссылок, подписку в Base64 либо полный Xray JSON.")
+            Text("Add Configuration").font(.title2.bold())
+            Text("Paste one or more links, a Base64 subscription, or a complete Xray JSON configuration.")
                 .foregroundStyle(.secondary)
             TextEditor(text: $text)
                 .font(.system(.body, design: .monospaced))
@@ -1886,12 +1915,12 @@ struct AddConfigSheet: View {
                 .background(Color.black.opacity(0.18), in: RoundedRectangle(cornerRadius: 14))
                 .frame(minHeight: 190)
             HStack {
-                Button("Из буфера") { text = NSPasteboard.general.string(forType: .string) ?? "" }
+                Button("From Clipboard") { text = NSPasteboard.general.string(forType: .string) ?? "" }
                 Spacer()
-                Button("Отмена") { dismiss() }
-                Button("Добавить") {
+                Button("Cancel") { dismiss() }
+                Button("Add") {
                     let count = store.addProfiles(from: text)
-                    store.showToast(count > 0 ? "Добавлено серверов: \(count)" : "Конфигурация не распознана")
+                    store.showToast(count > 0 ? "Servers added: \(count)" : "Configuration not recognized")
                     if count > 0 { dismiss() }
                 }
                 .buttonStyle(.borderedProminent).disabled(text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
@@ -1908,13 +1937,13 @@ struct AddSubscriptionSheet: View {
     @State private var url = ""
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text("Новая подписка").font(.title2.bold())
-            TextField("Название (необязательно)", text: $name)
+            Text("New Subscription").font(.title2.bold())
+            TextField("Name (optional)", text: $name)
             TextField("https://example.com/subscription", text: $url)
             HStack {
                 Spacer()
-                Button("Отмена") { dismiss() }
-                Button("Добавить") {
+                Button("Cancel") { dismiss() }
+                Button("Add") {
                     Task { await store.addSubscription(name: name, url: url); dismiss() }
                 }
                 .buttonStyle(.borderedProminent).disabled(url.isEmpty)
@@ -1930,16 +1959,16 @@ struct EditServerSheet: View {
     @State var server: ServerProfile
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text("Сервер").font(.title2.bold())
-            TextField("Название", text: $server.name)
+            Text("Server").font(.title2.bold())
+            TextField("Name", text: $server.name)
             HStack {
-                TextField("Хост", text: $server.host)
-                TextField("Порт", value: $server.port, format: .number).frame(width: 100)
+                TextField("Host", text: $server.host)
+                TextField("Port", value: $server.port, format: .number).frame(width: 100)
             }
             HStack {
                 Spacer()
-                Button("Отмена") { dismiss() }
-                Button("Сохранить") {
+                Button("Cancel") { dismiss() }
+                Button("Save") {
                     if let i = store.servers.firstIndex(where: { $0.id == server.id }) { store.servers[i] = server }
                     store.save(); dismiss()
                 }.buttonStyle(.borderedProminent)
@@ -1950,13 +1979,13 @@ struct EditServerSheet: View {
 
 struct SettingsView: View {
     @EnvironmentObject private var store: AppStore
-    @State private var selection = "Соединение"
+    @State private var selection = "Connection"
     @Namespace private var settingsIndicator
-    let sections = ["Соединение", "Маршрутизация", "DNS и сеть", "Автоматизация", "Диагностика"]
+    let sections = ["Connection", "Routing", "DNS and Network", "Automation", "Diagnostics"]
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Настройки").font(.system(size: 27, weight: .bold, design: .rounded))
+            Text("Settings").font(.system(size: 27, weight: .bold, design: .rounded))
             HStack(alignment: .top, spacing: 12) {
                 GlassCard(padding: 7) {
                     VStack(spacing: 1) {
@@ -2021,10 +2050,10 @@ struct SettingsView: View {
             Text(selection).font(.title3.bold())
             Divider()
             switch selection {
-            case "Соединение": connection
-            case "Маршрутизация": routing
-            case "DNS и сеть": network
-            case "Автоматизация": automation
+            case "Connection": connection
+            case "Routing": routing
+            case "DNS and Network": network
+            case "Automation": automation
             default: diagnostics
             }
         }
@@ -2032,38 +2061,38 @@ struct SettingsView: View {
 
     private var connection: some View {
         VStack(spacing: 13) {
-            SettingPicker(title: "Режим", subtitle: "Системный прокси не требует прав; TUN охватывает больше приложений", selection: $store.settings.mode)
-            SettingToggle(title: "Автопереподключение", subtitle: "Восстанавливать соединение после сетевого сбоя", value: $store.settings.autoReconnect)
-            SettingToggle(title: "Kill Switch", subtitle: "Не допускать прямой трафик при обрыве TUN", value: $store.settings.killSwitch)
-            SettingToggle(title: "Анализ трафика", subtitle: "Определять HTTP, TLS и QUIC для правил маршрутизации", value: $store.settings.sniffing)
+            SettingPicker(title: "Mode", subtitle: "System Proxy requires no privileges; TUN covers more applications", selection: $store.settings.mode)
+            SettingToggle(title: "Auto Reconnect", subtitle: "Restore the connection after a network failure", value: $store.settings.autoReconnect)
+            SettingToggle(title: "Kill Switch", subtitle: "Prevent direct traffic if the TUN connection drops", value: $store.settings.killSwitch)
+            SettingToggle(title: "Traffic Inspection", subtitle: "Detect HTTP, TLS, and QUIC for routing rules", value: $store.settings.sniffing)
             HStack {
-                FieldSetting(title: "SOCKS порт", value: $store.settings.localSocksPort)
-                FieldSetting(title: "HTTP порт", value: $store.settings.localHTTPPort)
+                FieldSetting(title: "SOCKS Port", value: $store.settings.localSocksPort)
+                FieldSetting(title: "HTTP Port", value: $store.settings.localHTTPPort)
             }
         }
     }
 
     private var routing: some View {
         VStack(spacing: 13) {
-            SettingPicker(title: "Профиль", subtitle: "Глобально, по правилам или прямое соединение", selection: $store.settings.routeMode)
-            SettingToggle(title: "Обход локальной сети", subtitle: "Принтеры, AirDrop и локальные устройства идут напрямую", value: $store.settings.bypassLAN)
-            TokenEditor(title: "Домены напрямую", values: $store.settings.directDomains, placeholder: "example.com")
-            TokenEditor(title: "Заблокированные домены", values: $store.settings.blockedDomains, placeholder: "ads.example.com")
-            TokenEditor(title: "Исключённые CIDR", values: $store.settings.excludedCIDRs, placeholder: "192.168.0.0/16")
-            TokenEditor(title: "Процессы напрямую (TUN)", values: $store.settings.excludedApps, placeholder: "AppStore")
+            SettingPicker(title: "Profile", subtitle: "Global, rules-based, or direct connection", selection: $store.settings.routeMode)
+            SettingToggle(title: "Bypass LAN", subtitle: "Printers, AirDrop, and local devices connect directly", value: $store.settings.bypassLAN)
+            TokenEditor(title: "Direct Domains", values: $store.settings.directDomains, placeholder: "example.com")
+            TokenEditor(title: "Blocked Domains", values: $store.settings.blockedDomains, placeholder: "ads.example.com")
+            TokenEditor(title: "Excluded CIDRs", values: $store.settings.excludedCIDRs, placeholder: "192.168.0.0/16")
+            TokenEditor(title: "Direct Processes (TUN)", values: $store.settings.excludedApps, placeholder: "AppStore")
         }
     }
 
     private var network: some View {
         VStack(spacing: 13) {
-            SettingToggle(title: "Защищённый DNS", subtitle: "Использовать выбранный DNS внутри туннеля", value: $store.settings.dnsEnabled)
+            SettingToggle(title: "Secure DNS", subtitle: "Use the selected DNS inside the tunnel", value: $store.settings.dnsEnabled)
             HStack {
-                Text("DNS-сервер"); Spacer()
+                Text("DNS Server"); Spacer()
                 TextField("1.1.1.1", text: $store.settings.dnsServer).frame(width: 180)
             }
-            SettingToggle(title: "IPv6", subtitle: "Разрешить IPv6-трафик", value: $store.settings.ipv6)
+            SettingToggle(title: "IPv6", subtitle: "Allow IPv6 traffic", value: $store.settings.ipv6)
             HStack {
-                Text("URL проверки"); Spacer()
+                Text("Test URL"); Spacer()
                 TextField("https://…", text: $store.settings.testURL).frame(width: 280)
             }
         }
@@ -2071,10 +2100,10 @@ struct SettingsView: View {
 
     private var automation: some View {
         VStack(spacing: 13) {
-            SettingToggle(title: "Подключаться при запуске", subtitle: "Запускать последний выбранный сервер", value: $store.settings.autoConnect)
-            SettingToggle(title: "Запускать вместе с macOS", subtitle: "Открывать materialTun после входа в систему", value: $store.settings.launchAtLogin)
-            SettingToggle(title: "Отключаться во сне", subtitle: "Завершать туннель при переходе Mac в сон", value: $store.settings.disconnectOnSleep)
-            Text("Автообновление подписок выполняется при запуске приложения.")
+            SettingToggle(title: "Connect at Launch", subtitle: "Start the last selected server", value: $store.settings.autoConnect)
+            SettingToggle(title: "Launch at Login", subtitle: "Open materialTun after signing in to macOS", value: $store.settings.launchAtLogin)
+            SettingToggle(title: "Disconnect on Sleep", subtitle: "Stop the tunnel when the Mac goes to sleep", value: $store.settings.disconnectOnSleep)
+            Text("Subscriptions are updated automatically when the application launches.")
                 .font(.caption).foregroundStyle(.secondary).frame(maxWidth: .infinity, alignment: .leading)
         }
     }
@@ -2082,14 +2111,14 @@ struct SettingsView: View {
     private var diagnostics: some View {
         VStack(alignment: .leading, spacing: 13) {
             HStack {
-                Text("Уровень логов")
+                Text("Log Level")
                 Spacer()
                 Picker("", selection: $store.settings.logLevel) {
                     ForEach(["none", "error", "warning", "info", "debug"], id: \.self) { Text($0.capitalized) }
                 }.frame(width: 140)
             }
             ScrollView {
-                Text(store.logs.isEmpty ? "Логи появятся после подключения." : store.logs.joined(separator: "\n"))
+                Text(store.logs.isEmpty ? "Logs will appear after connecting." : store.logs.joined(separator: "\n"))
                     .font(.system(size: 11, design: .monospaced))
                     .textSelection(.enabled)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -2098,8 +2127,8 @@ struct SettingsView: View {
             .frame(height: 210)
             .background(Color.black.opacity(0.22), in: RoundedRectangle(cornerRadius: 12))
             HStack {
-                Button("Очистить") { store.logs.removeAll() }
-                Button("Открыть папку данных") {
+                Button("Clear") { store.logs.removeAll() }
+                Button("Open Data Folder") {
                     let url = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appendingPathComponent("materialTun")
                     NSWorkspace.shared.open(url)
                 }
@@ -2109,10 +2138,10 @@ struct SettingsView: View {
 
     private func icon(_ item: String) -> String {
         switch item {
-        case "Соединение": "bolt.horizontal.circle"
-        case "Маршрутизация": "point.3.filled.connected.trianglepath.dotted"
-        case "DNS и сеть": "network"
-        case "Автоматизация": "clock.arrow.circlepath"
+        case "Connection": "bolt.horizontal.circle"
+        case "Routing": "point.3.filled.connected.trianglepath.dotted"
+        case "DNS and Network": "network"
+        case "Automation": "clock.arrow.circlepath"
         default: "stethoscope"
         }
     }
@@ -2230,9 +2259,9 @@ struct MenuBarView: View {
                 Text("\(server.type.rawValue) · \(server.host)").font(.caption).foregroundStyle(.secondary)
             }
             Divider()
-            Button(store.state.connected ? "Отключиться" : "Подключиться") { store.toggleConnection() }
+            Button(store.state.connected ? "Disconnect" : "Connect") { store.toggleConnection() }
                 .keyboardShortcut("v")
-            Menu("Выбрать сервер") {
+            Menu("Select Server") {
                 ForEach(store.servers) { server in
                     Button {
                         store.selectedServerID = server.id; store.save()
@@ -2243,11 +2272,11 @@ struct MenuBarView: View {
                 }
             }
             Divider()
-            Button("Открыть materialTun") {
+            Button("Open materialTun") {
                 NSApp.activate(ignoringOtherApps: true)
                 openWindow(id: "main")
             }
-            Button("Завершить") { NSApp.terminate(nil) }
+            Button("Quit") { NSApp.terminate(nil) }
         }
         .padding(12).frame(width: 260)
     }
@@ -2289,7 +2318,7 @@ struct materialTunApp: App {
         .defaultSize(width: 760, height: 560)
         .commands {
             CommandGroup(after: .appInfo) {
-                Button("Подключить / отключить") { store.toggleConnection() }
+                Button("Connect / Disconnect") { store.toggleConnection() }
                     .keyboardShortcut("v", modifiers: [.command, .shift])
             }
         }

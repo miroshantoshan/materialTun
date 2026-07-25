@@ -3,9 +3,9 @@ import AppKit
 import UniformTypeIdentifiers
 
 enum CompactTab: String, CaseIterable {
-    case connection = "Главная"
-    case profiles = "Профили"
-    case settings = "Настройки"
+    case connection = "Home"
+    case profiles = "Profiles"
+    case settings = "Settings"
 
     var icon: String {
         switch self {
@@ -17,9 +17,9 @@ enum CompactTab: String, CaseIterable {
 }
 
 enum SeedColor: String, CaseIterable, Identifiable {
-    case purple = "Фиолетовая"
-    case red = "Красная"
-    case amber = "Жёлтая"
+    case purple = "Purple"
+    case red = "Red"
+    case amber = "Amber"
     var id: String { rawValue }
 
     var color: Color {
@@ -108,7 +108,7 @@ struct CompactRootView: View {
                 store.importFiles([url])
             } else {
                 let count = store.addProfiles(from: url.absoluteString)
-                store.showToast(count > 0 ? "Профиль импортирован" : "Ссылка не распознана")
+                store.showToast(count > 0 ? "Profile imported" : "Link not recognized")
             }
         }
     }
@@ -124,7 +124,7 @@ struct CompactRootView: View {
                         Circle()
                             .fill(seed)
                             .frame(width: 9, height: 9)
-                        Text(store.activeWorkspace?.name ?? "Личный")
+                        Text(store.activeWorkspace?.name ?? "Personal")
                             .font(.system(size: 12, weight: .semibold))
                             .lineLimit(1)
                         Image(systemName: "chevron.down").font(.system(size: 8, weight: .bold))
@@ -137,13 +137,13 @@ struct CompactRootView: View {
                 Spacer()
 
                 Menu {
-                    Button("Импорт из буфера") {
+                    Button("Import from Clipboard") {
                         let text = NSPasteboard.general.string(forType: .string) ?? ""
                         let count = store.addProfiles(from: text)
-                        store.showToast(count > 0 ? "Добавлено: \(count)" : "Ничего не найдено")
+                        store.showToast(count > 0 ? "Added: \(count)" : "Nothing found")
                     }
-                    Button("QR из изображения…") { store.importQRImage() }
-                    Button("Проверить обновления") { Task { await store.checkForUpdates() } }
+                    Button("QR Code from Image…") { store.importQRImage() }
+                    Button("Check for Updates") { Task { await store.checkForUpdates() } }
                 } label: {
                     Image(systemName: "ellipsis")
                         .frame(width: 30, height: 30)
@@ -256,16 +256,16 @@ struct CompactConnectionView: View {
             VStack(spacing: 3) {
                 Text(store.state.title)
                     .font(.system(size: 20, weight: .bold, design: .rounded))
-                Text(store.selectedServer?.name ?? "Выберите сервер")
+                Text(store.selectedServer?.name ?? "Select a server")
                     .font(.system(size: 11, weight: .medium))
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
             }
 
             HStack(spacing: 8) {
-                TinyMetric(icon: "clock", value: duration, label: "Сессия")
-                TinyMetric(icon: "arrow.down", value: rate(store.downRate), label: "Загрузка")
-                TinyMetric(icon: "arrow.up", value: rate(store.upRate), label: "Отдача")
+                TinyMetric(icon: "clock", value: duration, label: "Session")
+                TinyMetric(icon: "arrow.down", value: rate(store.downRate), label: "Download")
+                TinyMetric(icon: "arrow.up", value: rate(store.upRate), label: "Upload")
             }
 
             if let server = store.selectedServer {
@@ -373,16 +373,16 @@ struct CompactProfilesView: View {
     var body: some View {
         VStack(spacing: 8) {
             HStack(spacing: 8) {
-                Text("Серверы")
+                Text("Servers")
                     .font(.system(size: 13, weight: .bold, design: .rounded))
 
                 Spacer()
                 Menu {
-                    Button("Ссылка или JSON") { showImport = true }
-                    Button("Из буфера") { importClipboard() }
-                    Button("QR из изображения") { store.importQRImage() }
-                    Button("Подписка") { showSubscription = true }
-                    Button("Файл…") { openFiles() }
+                    Button("Link or JSON") { showImport = true }
+                    Button("From Clipboard") { importClipboard() }
+                    Button("QR Code from Image") { store.importQRImage() }
+                    Button("Subscription") { showSubscription = true }
+                    Button("File…") { openFiles() }
                 } label: {
                     Image(systemName: "plus")
                         .font(.system(size: 12, weight: .bold))
@@ -412,7 +412,7 @@ struct CompactProfilesView: View {
     private var profileSection: some View {
         VStack(spacing: 7) {
             HStack {
-                Text("Добавленные вручную")
+                Text("Added Manually")
                     .font(.system(size: 11, weight: .bold))
                 Text("\(manualProfiles.count)")
                     .font(.system(size: 9, weight: .semibold))
@@ -422,7 +422,7 @@ struct CompactProfilesView: View {
             if manualProfiles.isEmpty {
                 VStack(spacing: 5) {
                     Image(systemName: "square.stack.3d.up.slash").foregroundStyle(.secondary)
-                    Text("Ручных профилей нет").font(.system(size: 10, weight: .semibold))
+                    Text("No manual profiles").font(.system(size: 10, weight: .semibold))
                 }
                 .frame(maxWidth: .infinity).frame(height: 72)
                 .compactCard()
@@ -440,21 +440,21 @@ struct CompactProfilesView: View {
     private var subscriptionSection: some View {
         VStack(spacing: 7) {
             HStack {
-                Text("Подписки")
+                Text("Subscriptions")
                     .font(.system(size: 11, weight: .bold))
                 Text("\(store.subscriptions.count)")
                     .font(.system(size: 9, weight: .semibold))
                     .foregroundStyle(.secondary)
                 Spacer()
-                Button("Обновить все") { Task { await store.updateAllSubscriptions() } }
+                Button("Update All") { Task { await store.updateAllSubscriptions() } }
                     .font(.system(size: 10, weight: .semibold))
             }
             if store.subscriptions.isEmpty {
                 HStack {
                     Image(systemName: "link.badge.plus").foregroundStyle(seed)
-                    Text("Добавьте URL подписки").font(.system(size: 10))
+                    Text("Add a subscription URL").font(.system(size: 10))
                     Spacer()
-                    Button("Добавить") { showSubscription = true }
+                    Button("Add") { showSubscription = true }
                         .font(.system(size: 9, weight: .semibold))
                 }
                 .padding(10).compactCard()
@@ -465,7 +465,7 @@ struct CompactProfilesView: View {
                             CompactSubscriptionRow(subscription: subscription, seed: seed)
                             let profiles = profiles(for: subscription)
                             if profiles.isEmpty {
-                                Text("В этой подписке пока нет серверов")
+                                Text("This subscription has no servers yet")
                                     .font(.system(size: 9))
                                     .foregroundStyle(.secondary)
                                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -495,7 +495,7 @@ struct CompactProfilesView: View {
         HStack(spacing: 7) {
             HStack(spacing: 6) {
                 Image(systemName: "magnifyingglass").font(.system(size: 10)).foregroundStyle(.secondary)
-                TextField("Поиск по всем серверам", text: $search).textFieldStyle(.plain).font(.system(size: 11))
+                TextField("Search all servers", text: $search).textFieldStyle(.plain).font(.system(size: 11))
             }
             .padding(.horizontal, 10).frame(height: 30).compactCard()
 
@@ -508,7 +508,7 @@ struct CompactProfilesView: View {
 
     private func importClipboard() {
         let count = store.addProfiles(from: NSPasteboard.general.string(forType: .string) ?? "")
-        store.showToast(count > 0 ? "Добавлено: \(count)" : "Не распознано")
+        store.showToast(count > 0 ? "Added: \(count)" : "Not recognized")
     }
 
     private func openFiles() {
@@ -543,22 +543,22 @@ struct CompactServerRow: View {
                 Spacer()
                 latency
                 Menu {
-                    Button("Проверить задержку") { store.testLatency(server.id) }
-                    Button("Редактировать") { editServer = server }
-                    Button("Дублировать") { store.duplicate(server) }
-                    Menu("Экспорт") {
-                        Button("Обычная ссылка") { store.exportProfile(server, format: "Native") }
+                    Button("Test Latency") { store.testLatency(server.id) }
+                    Button("Edit") { editServer = server }
+                    Button("Duplicate") { store.duplicate(server) }
+                    Menu("Export") {
+                        Button("Native Link") { store.exportProfile(server, format: "Native") }
                         Button("palazikVPN") { store.exportProfile(server, format: "palazikVPN") }
                         Button("JSON") { store.exportProfile(server, format: "JSON") }
-                        Button("QR-код…") { store.saveProfileQR(server) }
+                        Button("QR Code…") { store.saveProfileQR(server) }
                     }
-                    Button(server.favorite ? "Убрать из избранного" : "В избранное") {
+                    Button(server.favorite ? "Remove from Favorites" : "Add to Favorites") {
                         if let index = store.servers.firstIndex(where: { $0.id == server.id }) {
                             store.servers[index].favorite.toggle(); store.save()
                         }
                     }
                     Divider()
-                    Button("Удалить", role: .destructive) { confirmDelete = true }
+                    Button("Delete", role: .destructive) { confirmDelete = true }
                 } label: {
                     Image(systemName: "ellipsis").frame(width: 24, height: 30)
                 }
@@ -569,12 +569,12 @@ struct CompactServerRow: View {
         }
         .buttonStyle(.plain)
         .confirmationDialog(
-            "Удалить «\(server.name)»?",
+            "Delete “\(server.name)”?",
             isPresented: $confirmDelete,
             titleVisibility: .visible
         ) {
-            Button("Подтверждаю", role: .destructive) { store.deleteServer(server) }
-            Button("Отмена", role: .cancel) {}
+            Button("Delete", role: .destructive) { store.deleteServer(server) }
+            Button("Cancel", role: .cancel) {}
         }
     }
 
@@ -625,17 +625,17 @@ struct CompactSubscriptionRow: View {
         }
         .padding(10).compactCard()
         .confirmationDialog(
-            "Удалить подписку «\(subscription.name)» и все её серверы?",
+            "Delete the “\(subscription.name)” subscription and all its servers?",
             isPresented: $confirmDelete,
             titleVisibility: .visible
         ) {
-            Button("Подтверждаю", role: .destructive) { store.deleteSubscription(subscription) }
-            Button("Отмена", role: .cancel) {}
+            Button("Delete", role: .destructive) { store.deleteSubscription(subscription) }
+            Button("Cancel", role: .cancel) {}
         }
     }
 
     private var expiryText: String {
-        guard let expire = details?.expire else { return "Без срока окончания" }
+        guard let expire = details?.expire else { return "No expiration date" }
         let calendar = Calendar.current
         let days = calendar.dateComponents(
             [.day],
@@ -643,17 +643,12 @@ struct CompactSubscriptionRow: View {
             to: calendar.startOfDay(for: expire)
         ).day ?? 0
         let date = expire.formatted(.dateTime.day().month(.twoDigits).year())
-        if days < 0 { return "До окончания подписки: \(date) (истекла)" }
-        return "До окончания подписки: \(date) (\(days) \(dayWord(days)))"
+        if days < 0 { return "Subscription expired on \(date)" }
+        return "Subscription expires on \(date) (\(days) \(dayWord(days)) remaining)"
     }
 
     private func dayWord(_ value: Int) -> String {
-        let mod100 = value % 100
-        let mod10 = value % 10
-        if mod100 >= 11 && mod100 <= 14 { return "дней" }
-        if mod10 == 1 { return "день" }
-        if mod10 >= 2 && mod10 <= 4 { return "дня" }
-        return "дней"
+        return value == 1 ? "day" : "days"
     }
 
     private func formatBytes(_ value: Int64) -> String {
@@ -685,9 +680,9 @@ struct SubscriptionLogo: View {
 struct CompactSettingsView: View {
     @EnvironmentObject private var store: AppStore
     let seed: Color
-    @State private var section = "Вид"
+    @State private var section = "Appearance"
     @Namespace private var settingsSelection
-    private let sections = ["Вид", "Маршруты", "DNS", "Авто", "Профили", "Данные", "О приложении"]
+    private let sections = ["Appearance", "Routing", "DNS", "Automation", "Workspaces", "Data", "About"]
 
     var body: some View {
         HStack(alignment: .top, spacing: 9) {
@@ -724,12 +719,12 @@ struct CompactSettingsView: View {
             ScrollView {
                 VStack(spacing: 7) {
                     switch section {
-                    case "Вид": AppearanceSettings(seed: seed)
-                    case "Маршруты": RoutingSettings()
+                    case "Appearance": AppearanceSettings(seed: seed)
+                    case "Routing": RoutingSettings()
                     case "DNS": DNSSettings()
-                    case "Авто": AutomationSettings()
-                    case "Профили": WorkspaceSettings(seed: seed)
-                    case "Данные": DataSettings()
+                    case "Automation": AutomationSettings()
+                    case "Workspaces": WorkspaceSettings(seed: seed)
+                    case "Data": DataSettings()
                     default: AboutSettings(seed: seed)
                     }
                 }
@@ -744,12 +739,12 @@ struct CompactSettingsView: View {
 
     private func settingsIcon(_ item: String) -> String {
         switch item {
-        case "Вид": "paintpalette"
-        case "Маршруты": "point.3.connected.trianglepath.dotted"
+        case "Appearance": "paintpalette"
+        case "Routing": "point.3.connected.trianglepath.dotted"
         case "DNS": "network"
-        case "Авто": "clock.arrow.circlepath"
-        case "Профили": "person.2"
-        case "Данные": "externaldrive"
+        case "Automation": "clock.arrow.circlepath"
+        case "Workspaces": "person.2"
+        case "Data": "externaldrive"
         default: "info.circle"
         }
     }
@@ -760,9 +755,9 @@ struct AppearanceSettings: View {
     @AppStorage("SeedColor") private var seedName = SeedColor.purple.rawValue
 
     var body: some View {
-        SettingHeader("Оформление", icon: "paintpalette.fill")
+        SettingHeader("Appearance", icon: "paintpalette.fill")
         VStack(alignment: .leading, spacing: 7) {
-            Text("Тема интерфейса").font(.system(size: 10, weight: .semibold))
+            Text("Interface Theme").font(.system(size: 10, weight: .semibold))
             HStack(spacing: 10) {
                 ForEach(SeedColor.allCases) { item in
                     Button { seedName = item.rawValue } label: {
@@ -793,17 +788,17 @@ struct RoutingSettings: View {
     @AppStorage("AdBlock") private var adBlock = false
     @AppStorage("ChinaBypass") private var chinaBypass = false
     var body: some View {
-        SettingHeader("Маршрутизация", icon: "arrow.triangle.branch")
-        EnumPickerRow(title: "Режим", selection: $store.settings.routeMode)
-        CompactToggle(title: "Обход LAN", subtitle: "Локальные устройства напрямую", value: $store.settings.bypassLAN)
-        CompactToggle(title: "Kill switch", subtitle: "Блокировать утечки при обрыве", value: $store.settings.killSwitch)
-        CompactToggle(title: "IPv6", subtitle: "Разрешить IPv6 внутри туннеля", value: $store.settings.ipv6)
-        CompactToggle(title: "FakeDNS", subtitle: "Подмена DNS для прозрачной маршрутизации", value: $fakeDNS)
-        CompactToggle(title: "Блокировка рекламы", subtitle: "Правила geosite:category-ads-all", value: $adBlock)
-        CompactToggle(title: "Обход Китая", subtitle: "geoip:cn и geosite:cn напрямую", value: $chinaBypass)
-        TokenCompactEditor(title: "Напрямую", values: $store.settings.directDomains)
-        TokenCompactEditor(title: "Заблокировано", values: $store.settings.blockedDomains)
-        TokenCompactEditor(title: "Приложения мимо VPN", values: $store.settings.excludedApps)
+        SettingHeader("Routing", icon: "arrow.triangle.branch")
+        EnumPickerRow(title: "Mode", selection: $store.settings.routeMode)
+        CompactToggle(title: "Bypass LAN", subtitle: "Connect to local devices directly", value: $store.settings.bypassLAN)
+        CompactToggle(title: "Kill Switch", subtitle: "Block traffic leaks if the connection drops", value: $store.settings.killSwitch)
+        CompactToggle(title: "IPv6", subtitle: "Allow IPv6 inside the tunnel", value: $store.settings.ipv6)
+        CompactToggle(title: "FakeDNS", subtitle: "Map DNS responses for transparent routing", value: $fakeDNS)
+        CompactToggle(title: "Ad Blocking", subtitle: "Use geosite:category-ads-all rules", value: $adBlock)
+        CompactToggle(title: "Bypass China", subtitle: "Route geoip:cn and geosite:cn directly", value: $chinaBypass)
+        TokenCompactEditor(title: "Direct", values: $store.settings.directDomains)
+        TokenCompactEditor(title: "Blocked", values: $store.settings.blockedDomains)
+        TokenCompactEditor(title: "Apps Outside VPN", values: $store.settings.excludedApps)
     }
 }
 
@@ -814,8 +809,8 @@ struct DNSSettings: View {
     @AppStorage("GeoIPURL") private var geoIPURL = ""
     @AppStorage("GeoSiteURL") private var geoSiteURL = ""
     var body: some View {
-        SettingHeader("DNS и Geo", icon: "network")
-        CompactToggle(title: "Защищённый DNS", subtitle: "DNS-запросы через VPN", value: $store.settings.dnsEnabled)
+        SettingHeader("DNS and Geo", icon: "network")
+        CompactToggle(title: "Secure DNS", subtitle: "Send DNS queries through the VPN", value: $store.settings.dnsEnabled)
         CompactTextRow(title: "VPN DNS", text: $store.settings.dnsServer)
         CompactTextRow(title: "Remote DNS", text: $remoteDNS)
         CompactTextRow(title: "Direct DNS", text: $directDNS)
@@ -823,7 +818,7 @@ struct DNSSettings: View {
         CompactTextRow(title: "geosite.dat URL", text: $geoSiteURL)
         HStack {
             Spacer()
-            Button("Обновить Geo-файлы") {
+            Button("Update Geo Files") {
                 Task { await store.updateGeoFiles(geoIPURL: geoIPURL, geoSiteURL: geoSiteURL) }
             }
             .font(.system(size: 9, weight: .semibold))
@@ -833,22 +828,33 @@ struct DNSSettings: View {
 
 struct AutomationSettings: View {
     @EnvironmentObject private var store: AppStore
-    @AppStorage("SubscriptionInterval") private var interval = "24 часа"
+    @AppStorage("SubscriptionInterval") private var interval = "24 Hours"
     @AppStorage("SubscriptionUserAgent") private var userAgent = "Happ/2.18.1/macOSarm64"
     @AppStorage("LatencyMethod") private var latency = LatencyMethod.tcp.rawValue
     var body: some View {
-        SettingHeader("Автоматизация", icon: "clock.arrow.circlepath")
-        EnumPickerRow(title: "Подключение", selection: $store.settings.mode)
-        CompactToggle(title: "Автоподключение", subtitle: "Подключаться после запуска", value: $store.settings.autoConnect)
-        CompactToggle(title: "Переподключение", subtitle: "Восстанавливать туннель", value: $store.settings.autoReconnect)
+        SettingHeader("Automation", icon: "clock.arrow.circlepath")
+        EnumPickerRow(title: "Connection", selection: $store.settings.mode)
+        CompactToggle(title: "Auto Connect", subtitle: "Connect after launch", value: $store.settings.autoConnect)
+        CompactToggle(title: "Auto Reconnect", subtitle: "Restore the tunnel after interruption", value: $store.settings.autoReconnect)
         ToggleRowWithAction(
-            title: "Запуск с macOS",
+            title: "Launch at Login",
             value: store.settings.launchAtLogin,
             action: { store.setLaunchAtLogin($0) }
         )
-        CompactPicker(title: "Обновление подписок", selection: $interval, values: ["Выкл.", "1 час", "6 часов", "12 часов", "24 часа", "7 дней"])
-        CompactPicker(title: "Проверка задержки", selection: $latency, values: LatencyMethod.allCases.map(\.rawValue))
+        CompactPicker(title: "Subscription Updates", selection: $interval, values: ["Off", "1 Hour", "6 Hours", "12 Hours", "24 Hours", "7 Days"])
+        CompactPicker(title: "Latency Test", selection: $latency, values: LatencyMethod.allCases.map(\.rawValue))
         CompactTextRow(title: "User-Agent", text: $userAgent)
+        .onAppear {
+            let legacyIntervals = [
+                "\u{412}\u{44B}\u{43A}\u{43B}.": "Off",
+                "1 \u{447}\u{430}\u{441}": "1 Hour",
+                "6 \u{447}\u{430}\u{441}\u{43E}\u{432}": "6 Hours",
+                "12 \u{447}\u{430}\u{441}\u{43E}\u{432}": "12 Hours",
+                "24 \u{447}\u{430}\u{441}\u{430}": "24 Hours",
+                "7 \u{434}\u{43D}\u{435}\u{439}": "7 Days"
+            ]
+            if let migrated = legacyIntervals[interval] { interval = migrated }
+        }
     }
 }
 
@@ -857,35 +863,35 @@ struct WorkspaceSettings: View {
     let seed: Color
     @State private var workspaceToDelete: VPNWorkspace?
     var body: some View {
-        SettingHeader("Профили пользователей", icon: "person.2.fill")
+        SettingHeader("User Workspaces", icon: "person.2.fill")
         ForEach(store.workspaces) { workspace in
             HStack {
                 Circle().fill(seed).frame(width: 10, height: 10)
                 Text(workspace.name).font(.system(size: 10, weight: .semibold))
                 Spacer()
-                if workspace.id == store.activeWorkspaceID { Text("Активен").font(.system(size: 8)).foregroundStyle(seed) }
-                else { Button("Перейти") { store.switchWorkspace(workspace.id) }.font(.system(size: 9)) }
+                if workspace.id == store.activeWorkspaceID { Text("Active").font(.system(size: 8)).foregroundStyle(seed) }
+                else { Button("Switch") { store.switchWorkspace(workspace.id) }.font(.system(size: 9)) }
                 if store.workspaces.count > 1 {
                     Button { workspaceToDelete = workspace } label: { Image(systemName: "trash") }
                         .buttonStyle(.plain).foregroundStyle(.red.opacity(0.7))
                 }
             }.compactSettingBox()
         }
-        Text("Каждый профиль хранит собственные конфигурации, подписки и активный сервер.")
+        Text("Each workspace stores its own configurations, subscriptions, and active server.")
             .font(.system(size: 9)).foregroundStyle(.secondary)
         .confirmationDialog(
-            "Удалить пользовательский профиль?",
+            "Delete this user workspace?",
             isPresented: Binding(
                 get: { workspaceToDelete != nil },
                 set: { if !$0 { workspaceToDelete = nil } }
             ),
             titleVisibility: .visible
         ) {
-            Button("Подтверждаю", role: .destructive) {
+            Button("Delete", role: .destructive) {
                 if let workspaceToDelete { store.deleteWorkspace(workspaceToDelete.id) }
                 workspaceToDelete = nil
             }
-            Button("Отмена", role: .cancel) { workspaceToDelete = nil }
+            Button("Cancel", role: .cancel) { workspaceToDelete = nil }
         } message: {
             Text(workspaceToDelete?.name ?? "")
         }
@@ -896,31 +902,31 @@ struct DataSettings: View {
     @EnvironmentObject private var store: AppStore
     @State private var confirmClearLogs = false
     var body: some View {
-        SettingHeader("Данные и диагностика", icon: "externaldrive.fill")
+        SettingHeader("Data and Diagnostics", icon: "externaldrive.fill")
         VStack(alignment: .leading, spacing: 7) {
             HStack(spacing: 6) {
-                Button("Создать backup") { saveBackup() }
+                Button("Create Backup") { saveBackup() }
                     .frame(width: 120)
-                Button("Восстановить") { restoreBackup() }
+                Button("Restore") { restoreBackup() }
                     .frame(width: 120)
                 Spacer()
             }
             HStack(spacing: 6) {
-                Button("Копировать лог") {
+                Button("Copy Log") {
                     NSPasteboard.general.clearContents()
                     NSPasteboard.general.setString(store.logs.joined(separator: "\n"), forType: .string)
                 }
                 .frame(width: 120)
-                Button("Сохранить лог") { saveLog() }
+                Button("Save Log") { saveLog() }
                     .frame(width: 120)
-                Button("Очистить") { confirmClearLogs = true }
+                Button("Clear") { confirmClearLogs = true }
                     .frame(width: 80)
                 Spacer()
             }
         }
         .font(.system(size: 9))
         ScrollView {
-            Text(store.logs.isEmpty ? "Логи появятся после подключения." : store.logs.joined(separator: "\n"))
+            Text(store.logs.isEmpty ? "Logs will appear after connecting." : store.logs.joined(separator: "\n"))
                 .font(.system(size: 8, design: .monospaced))
                 .textSelection(.enabled)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -929,12 +935,12 @@ struct DataSettings: View {
         .frame(height: 150)
         .background(.black.opacity(0.22), in: RoundedRectangle(cornerRadius: 10))
         .confirmationDialog(
-            "Очистить журнал диагностики?",
+            "Clear the diagnostics log?",
             isPresented: $confirmClearLogs,
             titleVisibility: .visible
         ) {
-            Button("Подтверждаю", role: .destructive) { store.logs.removeAll() }
-            Button("Отмена", role: .cancel) {}
+            Button("Clear", role: .destructive) { store.logs.removeAll() }
+            Button("Cancel", role: .cancel) {}
         }
     }
 
@@ -943,7 +949,7 @@ struct DataSettings: View {
         panel.nameFieldStringValue = "materialTun-backup.json"
         panel.allowedContentTypes = [.json]
         if panel.runModal() == .OK, let url = panel.url {
-            do { try store.backup(to: url); store.showToast("Резервная копия создана") }
+            do { try store.backup(to: url); store.showToast("Backup created") }
             catch { store.showToast(error.localizedDescription) }
         }
     }
@@ -951,8 +957,8 @@ struct DataSettings: View {
         let panel = NSOpenPanel()
         panel.allowedContentTypes = [.json]
         if panel.runModal() == .OK, let url = panel.url {
-            do { try store.restoreBackup(from: url); store.showToast("Данные восстановлены") }
-            catch { store.showToast("Некорректная копия") }
+            do { try store.restoreBackup(from: url); store.showToast("Data restored") }
+            catch { store.showToast("Invalid backup") }
         }
     }
     private func saveLog() {
@@ -973,9 +979,9 @@ struct AboutSettings: View {
             Image(systemName: "shield.lefthalf.filled")
                 .font(.system(size: 34)).foregroundStyle(seed)
             Text("materialTun").font(.system(size: 18, weight: .bold, design: .rounded))
-            Text("Компактный клиент Xray + sing-box для macOS")
+            Text("A compact Xray + sing-box client for macOS")
                 .font(.system(size: 9)).foregroundStyle(.secondary)
-            Button("Проверить обновления") { Task { await store.checkForUpdates() } }
+            Button("Check for Updates") { Task { await store.checkForUpdates() } }
                 .font(.system(size: 10, weight: .semibold))
             if !store.updateStatus.isEmpty {
                 Text(store.updateStatus).font(.system(size: 9)).foregroundStyle(.secondary)
@@ -994,7 +1000,7 @@ struct ImportPreviewSheet: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("Импорт").font(.system(size: 18, weight: .bold, design: .rounded))
+            Text("Import").font(.system(size: 18, weight: .bold, design: .rounded))
             TextEditor(text: $text)
                 .font(.system(size: 10, design: .monospaced))
                 .scrollContentBackground(.hidden)
@@ -1002,20 +1008,20 @@ struct ImportPreviewSheet: View {
                 .background(.black.opacity(0.18), in: RoundedRectangle(cornerRadius: 12))
             if let first = parsed.first {
                 VStack(alignment: .leading, spacing: 4) {
-                    Label("\(parsed.count) конфигураций", systemImage: "checkmark.circle.fill").foregroundStyle(.green)
+                    Label("\(parsed.count) configurations", systemImage: "checkmark.circle.fill").foregroundStyle(.green)
                     Text("\(first.type.rawValue) · \(first.host):\(first.port)")
-                    Text(first.rawURI.contains("security=reality") ? "REALITY" : "Параметры ссылки проверены")
+                    Text(first.rawURI.contains("security=reality") ? "REALITY" : "Link parameters verified")
                         .foregroundStyle(.secondary)
                 }.font(.system(size: 10)).padding(9).compactCard()
             } else if !text.isEmpty {
-                Label("Формат пока не распознан", systemImage: "exclamationmark.triangle.fill")
+                Label("Format not recognized yet", systemImage: "exclamationmark.triangle.fill")
                     .font(.system(size: 10)).foregroundStyle(.orange)
             }
             HStack {
-                Button("Из буфера") { text = NSPasteboard.general.string(forType: .string) ?? "" }
+                Button("From Clipboard") { text = NSPasteboard.general.string(forType: .string) ?? "" }
                 Spacer()
-                Button("Отмена") { dismiss() }
-                Button("Импортировать") {
+                Button("Cancel") { dismiss() }
+                Button("Import") {
                     let count = store.addProfiles(from: text)
                     if count > 0 { dismiss() }
                 }
@@ -1035,31 +1041,31 @@ struct CompactEditorSheet: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 9) {
-            Text("Профиль").font(.system(size: 18, weight: .bold))
-            CompactTextRow(title: "Название", text: $server.name)
-            CompactTextRow(title: "Сервер", text: $server.host)
+            Text("Profile").font(.system(size: 18, weight: .bold))
+            CompactTextRow(title: "Name", text: $server.name)
+            CompactTextRow(title: "Server", text: $server.host)
             HStack {
-                Text("Порт").font(.system(size: 10))
+                Text("Port").font(.system(size: 10))
                 Spacer()
                 TextField("", value: $server.port, format: .number).frame(width: 90)
                     .textFieldStyle(.plain)
             }.compactSettingBox()
-            CompactToggle(title: "allowInsecure", subtitle: "Не проверять TLS-сертификат", value: $options.allowInsecure)
-            CompactToggle(title: "Mux", subtitle: "Мультиплексирование соединений", value: $options.mux)
-            CompactToggle(title: "TLS fragmentation", subtitle: "Anti-DPI фрагментация ClientHello", value: $options.tlsFragment)
+            CompactToggle(title: "allowInsecure", subtitle: "Do not verify the TLS certificate", value: $options.allowInsecure)
+            CompactToggle(title: "Mux", subtitle: "Multiplex connections", value: $options.mux)
+            CompactToggle(title: "TLS Fragmentation", subtitle: "Anti-DPI ClientHello fragmentation", value: $options.tlsFragment)
             if options.tlsFragment {
-                CompactTextRow(title: "Размер пакета", text: $options.fragmentLength)
-                CompactTextRow(title: "Интервал", text: $options.fragmentInterval)
+                CompactTextRow(title: "Packet Size", text: $options.fragmentLength)
+                CompactTextRow(title: "Interval", text: $options.fragmentInterval)
             }
-            SecureField("Секреты скрыты · изменяйте исходную ссылку при необходимости", text: .constant(""))
+            SecureField("Secrets are hidden · edit the original link if needed", text: .constant(""))
                 .textFieldStyle(.plain)
                 .font(.system(size: 9))
                 .padding(8)
                 .background(Color(hex: "2B2930"), in: RoundedRectangle(cornerRadius: 10))
             HStack {
                 Spacer()
-                Button("Отмена") { dismiss() }
-                Button("Сохранить") {
+                Button("Cancel") { dismiss() }
+                Button("Save") {
                     if let index = store.servers.firstIndex(where: { $0.id == server.id }) { store.servers[index] = server }
                     store.profileOptions[server.id] = options
                     store.save(); dismiss()
@@ -1078,15 +1084,15 @@ struct CompactSubscriptionSheet: View {
     @State private var url = ""
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("Новая подписка").font(.system(size: 18, weight: .bold))
-            Text("Название определится автоматически из ответа провайдера.")
+            Text("New Subscription").font(.system(size: 18, weight: .bold))
+            Text("The name will be detected automatically from the provider response.")
                 .font(.system(size: 9))
                 .foregroundStyle(.secondary)
             CompactTextRow(title: "URL", text: $url)
             HStack {
                 Spacer()
-                Button("Отмена") { dismiss() }
-                Button("Добавить") {
+                Button("Cancel") { dismiss() }
+                Button("Add") {
                     Task { await store.addSubscription(name: "", url: url); dismiss() }
                 }.buttonStyle(.borderedProminent).tint(seed).disabled(url.isEmpty)
             }.font(.system(size: 10))
@@ -1103,7 +1109,7 @@ struct WorkspaceSheet: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
-                Text("Профили пользователей").font(.system(size: 17, weight: .bold))
+                Text("User Workspaces").font(.system(size: 17, weight: .bold))
                 Spacer()
                 Button { onClose() } label: {
                     Image(systemName: "xmark")
@@ -1126,13 +1132,13 @@ struct WorkspaceSheet: View {
                 }.buttonStyle(.plain)
             }
             Divider()
-            TextField("Новый профиль", text: $name)
+            TextField("New Workspace", text: $name)
                 .textFieldStyle(.plain)
                 .padding(8)
                 .background(Color(hex: "2B2930"), in: RoundedRectangle(cornerRadius: 10))
             HStack {
                 Spacer()
-                Button("Создать") {
+                Button("Create") {
                     store.createWorkspace(name: name, colorHex: "6750A4"); onClose()
                 }.buttonStyle(.borderedProminent).tint(seed)
             }
@@ -1155,20 +1161,20 @@ struct OnboardingView: View {
             Image(systemName: page == 0 ? "shield.lefthalf.filled" : page == 1 ? "square.and.arrow.down" : "lock.shield")
                 .font(.system(size: 48)).foregroundStyle(seed)
                 .symbolEffect(.bounce, value: page)
-            Text(["Добро пожаловать", "Добавьте конфигурацию", "Разрешите TUN"][page])
+            Text(["Welcome", "Add a Configuration", "Allow TUN"][page])
                 .font(.system(size: 22, weight: .bold, design: .rounded))
             Text([
-                "Компактный VPN-клиент для Xray и sing-box.",
-                "Вставьте ссылку, откройте файл, подписку или QR-код.",
-                "Для полного VPN macOS запросит пароль администратора. Системный прокси работает без него."
+                "A compact VPN client for Xray and sing-box.",
+                "Paste a link or open a file, subscription, or QR code.",
+                "For full-device VPN, macOS will request an administrator password. System Proxy works without it."
             ][page])
             .font(.system(size: 11)).foregroundStyle(.secondary)
             .multilineTextAlignment(.center).frame(width: 340)
             Spacer()
             HStack {
-                if page > 0 { Button("Назад") { page -= 1 } }
+                if page > 0 { Button("Back") { page -= 1 } }
                 Spacer()
-                Button(page == 2 ? "Начать" : "Далее") {
+                Button(page == 2 ? "Get Started" : "Next") {
                     if page < 2 { page += 1 }
                     else { store.completeOnboarding(); dismiss() }
                 }.buttonStyle(.borderedProminent).tint(seed)
@@ -1353,20 +1359,20 @@ struct CompactMenuBarView: View {
                     .font(.system(size: 9)).foregroundStyle(.secondary)
             }
             Divider()
-            Button(store.state.connected ? "Отключиться" : "Подключиться") { store.toggleConnection() }
-            Menu("Сервер") {
+            Button(store.state.connected ? "Disconnect" : "Connect") { store.toggleConnection() }
+            Menu("Server") {
                 ForEach(store.servers) { server in
                     Button(server.name) { store.selectedServerID = server.id; store.save() }
                 }
             }
-            Menu("Профиль") {
+            Menu("Workspace") {
                 ForEach(store.workspaces) { workspace in
                     Button(workspace.name) { store.switchWorkspace(workspace.id) }
                 }
             }
             Divider()
-            Button("Открыть") { NSApp.activate(ignoringOtherApps: true); openWindow(id: "main") }
-            Button("Завершить") { NSApp.terminate(nil) }
+            Button("Open") { NSApp.activate(ignoringOtherApps: true); openWindow(id: "main") }
+            Button("Quit") { NSApp.terminate(nil) }
         }
         .padding(11).frame(width: 240)
         .onReceive(Timer.publish(every: 1, on: .main, in: .common).autoconnect()) { now = $0 }
@@ -1398,14 +1404,14 @@ final class CompactAppDelegate: NSObject, NSApplicationDelegate {
 
     @MainActor
     private func scheduleSubscriptionUpdates() {
-        let label = UserDefaults.standard.string(forKey: "SubscriptionInterval") ?? "24 часа"
+        let label = UserDefaults.standard.string(forKey: "SubscriptionInterval") ?? "24 Hours"
         let seconds: TimeInterval
         switch label {
-        case "1 час": seconds = 3600
-        case "6 часов": seconds = 21600
-        case "12 часов": seconds = 43200
-        case "7 дней": seconds = 604800
-        case "Выкл.": return
+        case "1 Hour", "1 \u{447}\u{430}\u{441}": seconds = 3600
+        case "6 Hours", "6 \u{447}\u{430}\u{441}\u{43E}\u{432}": seconds = 21600
+        case "12 Hours", "12 \u{447}\u{430}\u{441}\u{43E}\u{432}": seconds = 43200
+        case "7 Days", "7 \u{434}\u{43D}\u{435}\u{439}": seconds = 604800
+        case "Off", "\u{412}\u{44B}\u{43A}\u{43B}.": return
         default: seconds = 86400
         }
         subscriptionTimer = Timer.scheduledTimer(withTimeInterval: seconds, repeats: true) { _ in
