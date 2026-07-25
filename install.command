@@ -33,6 +33,7 @@ CYAN=$'\e[38;5;117m'
 GREEN=$'\e[38;5;114m'
 RED=$'\e[38;5;203m'
 GRAY=$'\e[38;5;245m'
+BANNER_WIDTH=48
 
 cleanup() {
     if [[ -d "$WORK_DIR" && "${WORK_DIR:t}" == materialtun-installer.* ]]; then
@@ -59,6 +60,30 @@ fail() {
     exit 1
 }
 
+banner_border() {
+    local left_corner="$1"
+    local right_corner="$2"
+    local rule
+    printf -v rule '%*s' "$BANNER_WIDTH" ''
+    rule="${rule// /─}"
+    print -- "${LIGHT_PURPLE}${left_corner}${rule}${right_corner}${RESET}"
+}
+
+banner_line() {
+    local text="${1:-}"
+    local color="${2:-$RESET}"
+    (( ${#text} <= BANNER_WIDTH )) || text="${text[1,$BANNER_WIDTH]}"
+    local text_width=${#text}
+    local left_padding=$(( (BANNER_WIDTH - text_width) / 2 ))
+    local right_padding=$(( BANNER_WIDTH - text_width - left_padding ))
+
+    print -n -- "${LIGHT_PURPLE}│${RESET}"
+    printf '%*s' "$left_padding" ''
+    print -n -- "${color}${text}${RESET}"
+    printf '%*s' "$right_padding" ''
+    print -- "${LIGHT_PURPLE}│${RESET}"
+}
+
 header() {
     if [[ -t 1 ]]; then
         print -n -- $'\e]0;materialTun Installer\a'
@@ -68,12 +93,12 @@ header() {
         fi
         clear
     fi
-    print -- "${LIGHT_PURPLE}╭────────────────────────────────────────────────╮${RESET}"
-    print -- "${LIGHT_PURPLE}│${RESET}                                                ${LIGHT_PURPLE}│${RESET}"
-    print -- "${LIGHT_PURPLE}│${RESET}          ${CYAN}${BOLD}◉  materialTun Installer${RESET}           ${LIGHT_PURPLE}│${RESET}"
-    print -- "${LIGHT_PURPLE}│${RESET}         ${GREEN}Secure connectivity for macOS${RESET}        ${LIGHT_PURPLE}│${RESET}"
-    print -- "${LIGHT_PURPLE}│${RESET}                                                ${LIGHT_PURPLE}│${RESET}"
-    print -- "${LIGHT_PURPLE}╰────────────────────────────────────────────────╯${RESET}"
+    banner_border "╭" "╮"
+    banner_line
+    banner_line "materialTun Installer" "${CYAN}${BOLD}"
+    banner_line "Secure connectivity for macOS" "$GREEN"
+    banner_line
+    banner_border "╰" "╯"
     print ""
 }
 
@@ -324,9 +349,9 @@ sleep 1
 open "$TARGET_APP" || fail "The application was installed but could not be opened."
 print -- "${GREEN}      ✓ materialTun is ready${RESET}"
 print ""
-print -- "${LIGHT_PURPLE}╭────────────────────────────────────────────────╮${RESET}"
-print -- "${LIGHT_PURPLE}│${RESET}       ${GREEN}${BOLD}Installation completed successfully${RESET}       ${LIGHT_PURPLE}│${RESET}"
-print -- "${LIGHT_PURPLE}╰────────────────────────────────────────────────╯${RESET}"
+banner_border "╭" "╮"
+banner_line "Installation completed successfully" "${GREEN}${BOLD}"
+banner_border "╰" "╯"
 print ""
 print -- "${DIM}  Temporary installation files will now be removed.${RESET}"
 sleep 1
