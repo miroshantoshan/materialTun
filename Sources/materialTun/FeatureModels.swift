@@ -275,15 +275,24 @@ extension AppStore {
         do {
             let (data, response) = try await URLSession.shared.data(for: request)
             let text = String(data: data, encoding: .utf8) ?? ""
-            if ConfigParser.isRejectedSubscription(text) {
+            let result = await parseSubscription(text, subscriptionID: subscription.id)
+            if result.isRejected {
                 throw NSError(
                     domain: "materialTun.Subscription",
                     code: 403,
                     userInfo: [NSLocalizedDescriptionKey: "Провайдер отклонил VPN-клиент"]
                 )
             }
-            servers.removeAll { $0.subscriptionID == subscription.id }
-            let count = addProfiles(from: text, subscriptionID: subscription.id)
+            let parsed = result.profiles
+            guard !parsed.isEmpty else {
+                throw NSError(
+                    domain: "materialTun.Subscription",
+                    code: 422,
+                    userInfo: [NSLocalizedDescriptionKey: "В подписке нет поддерживаемых конфигураций"]
+                )
+            }
+            replaceProfiles(parsed, for: subscription.id)
+            let count = parsed.count
             if let index = subscriptions.firstIndex(where: { $0.id == subscription.id }) {
                 subscriptions[index].lastUpdated = Date()
                 if let http = response as? HTTPURLResponse,
@@ -380,7 +389,8 @@ extension AppStore {
     }
 
     func updateAllSubscriptions() async {
-        for subscription in subscriptions { await refreshSubscriptionEnhanced(subscription) }
+        let enabledSubscriptions = subscriptions.filter(\.autoUpdate)
+        for subscription in enabledSubscriptions { await refreshSubscriptionEnhanced(subscription) }
     }
 
     private func parseSubscriptionInfo(_ value: String) -> SubscriptionDetails {

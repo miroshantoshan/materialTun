@@ -32,7 +32,7 @@ enum AppTab: String, CaseIterable {
     }
 }
 
-enum ProxyProtocol: String, Codable, CaseIterable {
+enum ProxyProtocol: String, Codable, CaseIterable, Sendable {
     case vless = "VLESS"
     case vmess = "VMess"
     case trojan = "Trojan"
@@ -79,7 +79,7 @@ enum RouteMode: String, Codable, CaseIterable, Identifiable {
     var id: String { rawValue }
 }
 
-struct ServerProfile: Codable, Identifiable, Hashable {
+struct ServerProfile: Codable, Identifiable, Hashable, Sendable {
     var id = UUID()
     var name: String
     var type: ProxyProtocol
@@ -98,6 +98,11 @@ struct Subscription: Codable, Identifiable, Hashable {
     var url: String
     var lastUpdated: Date?
     var autoUpdate = true
+}
+
+struct ParsedSubscription: Sendable {
+    let profiles: [ServerProfile]
+    let isRejected: Bool
 }
 
 struct AppSettings: Codable, Equatable {
@@ -262,16 +267,59 @@ final class AppStore: ObservableObject {
 
     func addProfiles(from input: String, subscriptionID: UUID? = nil) -> Int {
         let parsed = ConfigParser.parseMany(input, subscriptionID: subscriptionID)
-        for profile in parsed {
-            if let index = servers.firstIndex(where: { $0.rawURI == profile.rawURI }) {
-                servers[index] = profile
-            } else {
-                servers.append(profile)
-            }
-        }
+        mergeProfiles(parsed)
         if selectedServerID == nil { selectedServerID = servers.first?.id }
         save()
         return parsed.count
+    }
+
+    func parseSubscription(_ text: String, subscriptionID: UUID) async -> ParsedSubscription {
+        await Task.detached(priority: .userInitiated) {
+            let profiles = ConfigParser.parseMany(text, subscriptionID: subscriptionID)
+            return ParsedSubscription(
+                profiles: profiles,
+                isRejected: ConfigParser.isRejectedSubscription(text, parsedProfiles: profiles)
+            )
+        }.value
+    }
+
+    private func mergeProfiles(_ profiles: [ServerProfile]) {
+        var merged = servers
+        var indexes = Dictionary(merged.enumerated().map { ($0.element.rawURI, $0.offset) }, uniquingKeysWith: { first, _ in first })
+        for profile in profiles {
+            if let index = indexes[profile.rawURI] {
+                var updated = profile
+                updated.id = merged[index].id
+                updated.ping = merged[index].ping
+                updated.lastUsed = merged[index].lastUsed
+                updated.favorite = merged[index].favorite
+                merged[index] = updated
+            } else {
+                indexes[profile.rawURI] = merged.count
+                merged.append(profile)
+            }
+        }
+        servers = merged
+    }
+
+    func replaceProfiles(_ profiles: [ServerProfile], for subscriptionID: UUID) {
+        let oldProfiles = servers.filter { $0.subscriptionID == subscriptionID }
+        let oldByURI = Dictionary(oldProfiles.map { ($0.rawURI, $0) }, uniquingKeysWith: { first, _ in first })
+        let replacements = profiles.map { profile -> ServerProfile in
+            guard let old = oldByURI[profile.rawURI] else { return profile }
+            var updated = profile
+            updated.id = old.id
+            updated.ping = old.ping
+            updated.lastUsed = old.lastUsed
+            updated.favorite = old.favorite
+            return updated
+        }
+        var updatedServers = servers.filter { $0.subscriptionID != subscriptionID }
+        updatedServers.append(contentsOf: replacements)
+        servers = updatedServers
+        if !servers.contains(where: { $0.id == selectedServerID }) {
+            selectedServerID = replacements.first?.id ?? servers.first?.id
+        }
     }
 
     func importFiles(_ urls: [URL]) {
@@ -294,10 +342,16 @@ final class AppStore: ObservableObject {
         do {
             let (data, response) = try await URLSession.shared.data(for: subscriptionRequest(url: remote))
             let text = String(data: data, encoding: .utf8) ?? ""
-            guard !ConfigParser.isRejectedSubscription(text) else {
+            let result = await parseSubscription(text, subscriptionID: item.id)
+            guard !result.isRejected else {
                 throw NSError(domain: "materialTun.Subscription", code: 403, userInfo: [NSLocalizedDescriptionKey: "Провайдер отклонил клиент"])
             }
-            let count = addProfiles(from: text, subscriptionID: item.id)
+            let parsed = result.profiles
+            guard !parsed.isEmpty else {
+                throw NSError(domain: "materialTun.Subscription", code: 422, userInfo: [NSLocalizedDescriptionKey: "В подписке нет поддерживаемых конфигураций"])
+            }
+            mergeProfiles(parsed)
+            let count = parsed.count
             item.lastUpdated = Date()
             if name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
                let http = response as? HTTPURLResponse,
@@ -318,11 +372,16 @@ final class AppStore: ObservableObject {
         do {
             let (data, response) = try await URLSession.shared.data(for: subscriptionRequest(url: url))
             let text = String(data: data, encoding: .utf8) ?? ""
-            guard !ConfigParser.isRejectedSubscription(text) else {
+            let result = await parseSubscription(text, subscriptionID: subscription.id)
+            guard !result.isRejected else {
                 throw NSError(domain: "materialTun.Subscription", code: 403, userInfo: [NSLocalizedDescriptionKey: "Провайдер отклонил клиент"])
             }
-            servers.removeAll { $0.subscriptionID == subscription.id }
-            let count = addProfiles(from: text, subscriptionID: subscription.id)
+            let parsed = result.profiles
+            guard !parsed.isEmpty else {
+                throw NSError(domain: "materialTun.Subscription", code: 422, userInfo: [NSLocalizedDescriptionKey: "В подписке нет поддерживаемых конфигураций"])
+            }
+            replaceProfiles(parsed, for: subscription.id)
+            let count = parsed.count
             if let i = subscriptions.firstIndex(where: { $0.id == subscription.id }) {
                 subscriptions[i].lastUpdated = Date()
                 if let http = response as? HTTPURLResponse,
@@ -825,11 +884,11 @@ final class AppStore: ObservableObject {
 }
 
 enum ConfigParser {
-    static func isRejectedSubscription(_ raw: String) -> Bool {
+    static func isRejectedSubscription(_ raw: String, parsedProfiles: [ServerProfile]? = nil) -> Bool {
         let text = decodeBase64TextIfNeeded(raw)
         let lower = text.lowercased()
         if lower.contains("app not supported") || lower.contains("unsupported client") { return true }
-        let parsed = parseMany(raw)
+        let parsed = parsedProfiles ?? parseMany(raw)
         return parsed.count == 1
             && parsed[0].host == "0.0.0.0"
             && parsed[0].port == 1
