@@ -19,13 +19,41 @@
 - Provides System Proxy and TUN connection modes.
 - Includes routing, DNS, Geo file, subscription refresh, backup/restore, diagnostics, and workspace controls.
 - Includes a menu bar controller for quick connect/disconnect and profile switching.
+- Includes an English and Russian interface. English is used by default and the language can be changed in Settings → Appearance.
+
+## Install
+
+The recommended installation method is the bundled `install.command` installer. Download it and open it from Finder, or run:
+
+```bash
+curl -fsSLO https://raw.githubusercontent.com/miroshantoshan/materialTun/main/install.command
+chmod +x install.command
+./install.command
+```
+
+The installer automatically:
+
+- Downloads the latest materialTun source from GitHub.
+- Detects Apple Silicon or Intel Macs.
+- Downloads the correct Xray and sing-box builds.
+- Uses the GeoIP and GeoSite databases included with Xray.
+- Installs Apple's free Developer Tools if Swift is not available.
+- Builds and ad-hoc signs the application.
+- Installs materialTun to `~/Applications/materialTun.app` and launches it.
+
+The first TUN connection may request an administrator password to install the privileged helper. System Proxy mode does not require helper installation.
 
 ## Requirements
 
 - macOS 14 or newer.
-- Swift 6 / Xcode command line tools.
-- Xray, sing-box, `geoip.dat`, and `geosite.dat` available in the expected build layout.
-- Administrator permission for first-time TUN helper installation.
+- An internet connection during installation.
+- Administrator permission only when enabling TUN for the first time.
+
+Swift, Xray, sing-box, and Geo files are handled automatically by `install.command`.
+
+### Manual build requirements
+
+Manual packaging with `build.sh` requires Swift 6 / Xcode Command Line Tools and a local Happ bundle containing Xray, sing-box, `geoip.dat`, and `geosite.dat`.
 
 The build script copies runtime assets from:
 
@@ -43,29 +71,33 @@ The build script copies runtime assets from:
 ├── App/
 │   └── Info.plist
 ├── Resources/
-│   └── AppIcon.svg
+│   └── AppIcon.png
 ├── Sources/
 │   ├── materialTun/
 │   │   ├── CompactUI.swift
 │   │   ├── FeatureModels.swift
+│   │   ├── Localization.swift
 │   │   └── MaterialTun.swift
 │   └── materialTunHelper/
 │       └── main.swift
 ├── Package.swift
 ├── README.md
+├── install.command
 └── build.sh
 ```
 
 ## Main Files
 
 - `Sources/materialTun/CompactUI.swift`: active `@main` app, compact UI, onboarding, profile screens, settings, import sheets, and menu bar extra.
+- `Sources/materialTun/Localization.swift`: English/Russian localization and the saved language preference.
 - `Sources/materialTun/MaterialTun.swift`: app store, connection lifecycle, profile parser, Xray config builder, system proxy handling, TUN helper installation, and traffic stats.
 - `Sources/materialTun/FeatureModels.swift`: workspaces, backup/restore, QR import/export, subscriptions, latency checks, sing-box config generation, and Geo file updates.
 - `Sources/materialTunHelper/main.swift`: privileged TUN helper that watches command files and starts/stops sing-box.
 - `App/Info.plist`: metadata for the single compact app bundle.
-- `build.sh`: the only packaging script.
+- `install.command`: recommended end-user installer with automatic runtime downloads.
+- `build.sh`: local universal app packaging script for development.
 
-## Build
+## Manual Build
 
 Build the Swift package:
 
@@ -85,7 +117,7 @@ The packaged app is written to:
 dist/Here/materialTun.app
 ```
 
-The script builds universal `arm64` + `x86_64` binaries, copies Xray/sing-box/geodata into the app bundle, generates `AppIcon.icns`, clears quarantine attributes, and ad-hoc signs the app.
+The manual script builds universal `arm64` + `x86_64` binaries, copies Xray/sing-box/geodata from the local Happ bundle, generates `AppIcon.icns`, clears quarantine attributes, and ad-hoc signs the app.
 
 ## App Bundle
 
@@ -134,4 +166,4 @@ The helper runs as `local.materialtun.helper`, reads commands from the app suppo
 - This repository intentionally keeps only the compact build path.
 - Distribution output is kept in `dist/Here`.
 - The older experimental UI in `MaterialTun.swift` remains behind `#if false` and is not compiled.
-- There is no automated test suite yet; use `swift build` and `./build.sh` as the current verification path.
+- There is no automated test suite yet; use `swift build`, `./build.sh`, and the installer syntax check (`zsh -n install.command`) as the current verification path.
